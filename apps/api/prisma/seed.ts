@@ -47,7 +47,13 @@ async function main(): Promise<void> {
       ["task.write", "Create/update operational tasks"],
       ["workorder.read", "Read work orders"],
       ["workorder.write", "Create/update work orders"],
-      ["workorder.assign", "Assign work order vendors"]
+      ["workorder.assign", "Assign work order vendors"],
+      ["invoice.read", "Read invoice records"],
+      ["invoice.write", "Create/update invoice records"],
+      ["invoice.review", "Submit and manage invoice review state"],
+      ["invoice.approve", "Approve/reject invoices"],
+      ["approval.read", "Read approval flows and steps"],
+      ["approval.write", "Act on approval flows"]
     ].map(([permissionName, description]) =>
       prisma.permission.upsert({
         where: { permissionName },
@@ -106,6 +112,21 @@ async function main(): Promise<void> {
     }
   });
 
+  const financeRole = await prisma.role.upsert({
+    where: {
+      organizationId_roleName: {
+        organizationId: organization.id,
+        roleName: "finance"
+      }
+    },
+    update: { description: "Finance approvals role" },
+    create: {
+      organizationId: organization.id,
+      roleName: "finance",
+      description: "Finance approvals role"
+    }
+  });
+
   const rolePermissions: Record<string, string[]> = {
     admin: [
       "organization.read",
@@ -134,7 +155,13 @@ async function main(): Promise<void> {
       "task.write",
       "workorder.read",
       "workorder.write",
-      "workorder.assign"
+      "workorder.assign",
+      "invoice.read",
+      "invoice.write",
+      "invoice.review",
+      "invoice.approve",
+      "approval.read",
+      "approval.write"
     ],
     operations: [
       "organization.read",
@@ -158,7 +185,20 @@ async function main(): Promise<void> {
       "task.write",
       "workorder.read",
       "workorder.write",
-      "workorder.assign"
+      "workorder.assign",
+      "invoice.read",
+      "invoice.write",
+      "invoice.review",
+      "approval.read"
+    ],
+    finance: [
+      "organization.read",
+      "invoice.read",
+      "invoice.write",
+      "invoice.review",
+      "invoice.approve",
+      "approval.read",
+      "approval.write"
     ],
     owner: ["organization.read"]
   };
@@ -166,6 +206,7 @@ async function main(): Promise<void> {
   const roles = {
     admin: adminRole.id,
     operations: operationsRole.id,
+    finance: financeRole.id,
     owner: ownerRole.id
   };
 
