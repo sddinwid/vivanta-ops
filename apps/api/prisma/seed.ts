@@ -36,7 +36,10 @@ async function main(): Promise<void> {
       ["document.read", "Read document metadata and linked records"],
       ["document.write", "Upload and update document metadata"],
       ["document.link", "Link/unlink documents to operational entities"],
-      ["document.reprocess", "Request document reprocessing"]
+      ["document.reprocess", "Request document reprocessing"],
+      ["communication.read", "Read communication threads and messages"],
+      ["communication.write", "Create/update communication threads and messages"],
+      ["communication.assign", "Assign communication threads"]
     ].map(([permissionName, description]) =>
       prisma.permission.upsert({
         where: { permissionName },
@@ -112,7 +115,10 @@ async function main(): Promise<void> {
       "document.read",
       "document.write",
       "document.link",
-      "document.reprocess"
+      "document.reprocess",
+      "communication.read",
+      "communication.write",
+      "communication.assign"
     ],
     operations: [
       "organization.read",
@@ -125,7 +131,10 @@ async function main(): Promise<void> {
       "document.read",
       "document.write",
       "document.link",
-      "document.reprocess"
+      "document.reprocess",
+      "communication.read",
+      "communication.write",
+      "communication.assign"
     ],
     owner: ["organization.read"]
   };

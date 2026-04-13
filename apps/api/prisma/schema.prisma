@@ -64,6 +64,34 @@ enum DocumentLinkedEntityType {
   VENDOR
 }
 
+enum CommunicationChannelType {
+  EMAIL
+  PHONE
+  PORTAL
+  SMS
+  INTERNAL
+}
+
+enum CommunicationThreadStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+enum CommunicationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+  INTERNAL
+}
+
 model Organization {
   id          String                @id @default(uuid())
   name        String
@@ -78,6 +106,7 @@ model Organization {
   owners      Owner[]
   vendors     Vendor[]
   documents   Document[]
+  communicationThreads CommunicationThread[]
 }
 
 model User {
@@ -97,6 +126,8 @@ model User {
   actorForAuditEvents  AuditEvent[]         @relation("AuditActor")
   managedProperties    Property[]           @relation("PropertyManager")
   uploadedDocuments    Document[]           @relation("DocumentUploadedBy")
+  createdCommunicationThreads CommunicationThread[] @relation("ThreadCreatedBy")
+  assignedCommunicationThreads CommunicationThread[] @relation("ThreadAssignedTo")
 
   @@index([organizationId])
 }
@@ -295,6 +326,7 @@ model Document {
   uploadedByUser  User?                   @relation("DocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
   links           DocumentLink[]
   attachments     Attachment[]
+  messageAttachments MessageAttachment[]
 
   @@index([organizationId])
   @@index([uploadedByUserId])
@@ -323,4 +355,56 @@ model Attachment {
 
   @@index([documentId])
   @@index([attachmentContextType, attachmentContextId])
+}
+
+model CommunicationThread {
+  id               String                    @id @default(uuid())
+  organizationId   String
+  channelType      CommunicationChannelType
+  subject          String?
+  status           CommunicationThreadStatus @default(OPEN)
+  priority         CommunicationPriority     @default(NORMAL)
+  linkedEntityType DocumentLinkedEntityType?
+  linkedEntityId   String?
+  createdByUserId  String?
+  assignedUserId   String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  organization     Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdByUser    User?                     @relation("ThreadCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  assignedUser     User?                     @relation("ThreadAssignedTo", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  messages         Message[]
+
+  @@index([organizationId])
+  @@index([assignedUserId])
+  @@index([linkedEntityType, linkedEntityId])
+}
+
+model Message {
+  id                String           @id @default(uuid())
+  threadId          String
+  direction         MessageDirection @default(OUTBOUND)
+  senderType        String?
+  senderReferenceId String?
+  bodyText          String?
+  bodyHtml          String?
+  messageStatus     String?
+  receivedAt        DateTime?
+  sentAt            DateTime?
+  createdAt         DateTime         @default(now())
+  thread            CommunicationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  attachments       MessageAttachment[]
+
+  @@index([threadId])
+}
+
+model MessageAttachment {
+  messageId   String
+  documentId  String
+  createdAt   DateTime @default(now())
+  message     Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, documentId])
+  @@index([documentId])
 }
