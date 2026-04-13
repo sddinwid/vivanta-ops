@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException
 } from "@nestjs/common";
 import {
@@ -18,13 +19,17 @@ import { CreateApprovalFlowDto } from "../dto/create-approval-flow.dto";
 import { ApprovalMapper } from "../mappers/approval.mapper";
 import { ApprovalStepsRepository } from "../repositories/approval-steps.repository";
 import { ApprovalsRepository } from "../repositories/approvals.repository";
+import { WorkflowFacadeService } from "../../workflows/services/workflow-facade.service";
 
 @Injectable()
 export class ApprovalsService {
+  private readonly logger = new Logger(ApprovalsService.name);
+
   constructor(
     private readonly approvalsRepository: ApprovalsRepository,
     private readonly approvalStepsRepository: ApprovalStepsRepository,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly workflowFacadeService: WorkflowFacadeService
   ) {}
 
   async list(organizationId: string, filters: ApprovalFiltersDto) {
@@ -85,6 +90,18 @@ export class ApprovalsService {
       newValues: ApprovalMapper.flowToResponse(withSteps),
       metadata: { requestId }
     });
+    try {
+      await this.workflowFacadeService.startApprovalFlowWorkflow({
+        organizationId,
+        approvalFlowId: flow.id,
+        actorUserId,
+        requestId
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Approval workflow visibility hook failed for approvalFlowId=${flow.id}: ${error instanceof Error ? error.message : "unknown error"}`
+      );
+    }
     return ApprovalMapper.flowToResponse(withSteps);
   }
 
@@ -172,6 +189,18 @@ export class ApprovalsService {
       newValues: ApprovalMapper.flowToResponse(withSteps),
       metadata: { requestId: params.requestId, invoiceId: params.invoiceId }
     });
+    try {
+      await this.workflowFacadeService.startApprovalFlowWorkflow({
+        organizationId: params.organizationId,
+        approvalFlowId: flow.id,
+        actorUserId: params.actorUserId,
+        requestId: params.requestId
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Approval workflow visibility hook failed for approvalFlowId=${flow.id}: ${error instanceof Error ? error.message : "unknown error"}`
+      );
+    }
 
     return withSteps;
   }
@@ -304,4 +333,3 @@ export class ApprovalsService {
     return flow;
   }
 }
-

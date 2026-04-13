@@ -3,6 +3,7 @@ import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "../../common/guards/permissions.guard";
 import { PrismaModule } from "../../database/prisma/prisma.module";
 import { AuditModule } from "../audit/audit.module";
+import { WorkflowsModule } from "../workflows/workflows.module";
 import { CommunicationsController } from "./controllers/communications.controller";
 import { CommunicationMapper } from "./mappers/communication.mapper";
 import { MessageMapper } from "./mappers/message.mapper";
@@ -14,7 +15,7 @@ import { CommunicationLinkingService } from "./services/communication-linking.se
 import { CommunicationsService } from "./services/communications.service";
 
 @Module({
-  imports: [PrismaModule, AuditModule],
+  imports: [PrismaModule, AuditModule, WorkflowsModule],
   controllers: [CommunicationsController],
   providers: [
     CommunicationsService,
