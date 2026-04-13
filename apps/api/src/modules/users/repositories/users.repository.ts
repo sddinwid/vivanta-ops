@@ -99,4 +99,11 @@ export class UsersRepository {
       }
     });
   }
+
+  findOwnerInOrganization(ownerId: string, organizationId: string) {
+    return this.prisma.owner.findFirst({
+      where: { id: ownerId, organizationId },
+      select: { id: true }
+    });
+  }
 }

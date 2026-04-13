@@ -53,6 +53,21 @@ export class UsersService {
     requestId?: string;
   }) {
     const { organizationId, actorUserId, dto, requestId } = params;
+    const userType = dto.userType ?? UserType.INTERNAL;
+
+    if (dto.ownerId && userType !== UserType.OWNER) {
+      throw new BadRequestException("ownerId is only allowed for OWNER userType");
+    }
+    if (dto.ownerId) {
+      const owner = await this.usersRepository.findOwnerInOrganization(
+        dto.ownerId,
+        organizationId
+      );
+      if (!owner) {
+        throw new BadRequestException("ownerId must belong to the same organization");
+      }
+    }
+
     const passwordHash = await bcrypt.hash(dto.password ?? randomUUID(), 10);
 
     try {
@@ -62,8 +77,9 @@ export class UsersService {
         passwordHash,
         firstName: dto.firstName,
         lastName: dto.lastName,
-        userType: dto.userType ?? UserType.INTERNAL,
-        status: dto.status ?? UserStatus.ACTIVE
+        userType,
+        status: dto.status ?? UserStatus.ACTIVE,
+        owner: dto.ownerId ? { connect: { id: dto.ownerId } } : undefined
       });
 
       await this.auditService.record({
@@ -114,6 +130,27 @@ export class UsersService {
       userType: dto.userType,
       status: dto.status
     };
+
+    const nextUserType = dto.userType ?? existing.userType;
+    const nextOwnerId =
+      dto.ownerId === undefined ? existing.ownerId : dto.ownerId;
+
+    if (nextOwnerId && nextUserType !== UserType.OWNER) {
+      throw new BadRequestException("ownerId is only allowed for OWNER userType");
+    }
+    if (nextOwnerId) {
+      const owner = await this.usersRepository.findOwnerInOrganization(
+        nextOwnerId,
+        organizationId
+      );
+      if (!owner) {
+        throw new BadRequestException("ownerId must belong to the same organization");
+      }
+      data.owner = { connect: { id: nextOwnerId } };
+    } else if (dto.ownerId === null) {
+      data.owner = { disconnect: true };
+    }
+
     if (dto.password) {
       data.passwordHash = await bcrypt.hash(dto.password, 10);
     }
