@@ -1,5 +1,5 @@
 # Vivanta Operations OS
-A modular, workflow-oriented system of record and system of action for property management operations.
+A modular, workflow-oriented backend for property management operations, designed as a system of record and system of action.
 
 ## What This Project Is
 
@@ -13,6 +13,8 @@ It is implemented as a NestJS modular monolith with PostgreSQL + Prisma and incl
 - invoice + approval backbone
 - workflow visibility (`WorkflowRun`, `WorkflowEvent`) with orchestration facade
 - owner portal projection API (read-only, owner-scoped)
+
+It is designed as an internal operations system rather than a user-facing product, with APIs structured for future UI and automation layers.
 
 ## Why This Project Exists
 
@@ -86,7 +88,7 @@ This project is a practical foundation for:
 2. An operations user creates a case in the `cases` module for the same issue context.
 3. A work order is created from that case in the `work-orders` module.
 4. A vendor is assigned to the work order, with organization-level validation.
-5. Workflow visibility is recorded via `WorkflowRun` and `WorkflowEvent` (for example, `communication_triage` and `case_lifecycle`).
+5. Workflow visibility is recorded via `WorkflowRun` and `WorkflowEvent`, enabling traceability across modules without tightly coupling execution logic.
 
 ## Workflow Architecture
 
@@ -152,7 +154,7 @@ Local seeded admin credentials (dev only):
 - **Workflow visibility before full orchestration:** `WorkflowRun`/`WorkflowEvent` provide operational traceability now without forcing premature workflow-engine coupling.
 - **Temporal behind a facade:** orchestration provider details are isolated so the system can migrate incrementally from stubbed behavior to real Temporal execution.
 - **Projection APIs for portal access:** owner-facing endpoints intentionally shape and scope data instead of exposing internal operational models directly.
-- **Auditability from the start:** state-changing actions are recorded early so operational accountability and debugging remain reliable as complexity grows.
+- **Audit-first design:** state-changing actions are recorded early so operational accountability and debugging remain reliable as complexity grows.
 
 ## Future Direction
 
@@ -160,3 +162,7 @@ Local seeded admin credentials (dev only):
 - layer in AI where it improves operator workflows
 - add external integration adapters (accounting, delivery, notifications)
 - build full portal and internal product UI surfaces on top of current APIs
+
+---
+
+This repository represents a backend foundation that can evolve into a full workflow-driven operations platform without requiring a rewrite of core domain logic.
