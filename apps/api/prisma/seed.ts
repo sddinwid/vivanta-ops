@@ -26,7 +26,13 @@ async function main(): Promise<void> {
       ["user.write", "Create/update users"],
       ["role.read", "Read roles and permissions"],
       ["role.write", "Manage roles and user role assignments"],
-      ["audit.read", "Read audit events"]
+      ["audit.read", "Read audit events"],
+      ["property.read", "Read property, building, and unit records"],
+      ["property.write", "Create/update property, building, and unit records"],
+      ["owner.read", "Read owner records and ownership links"],
+      ["owner.write", "Create/update owner records and ownership links"],
+      ["vendor.read", "Read vendor directory records"],
+      ["vendor.write", "Create/update vendor directory records"]
     ].map(([permissionName, description]) =>
       prisma.permission.upsert({
         where: { permissionName },
@@ -92,9 +98,23 @@ async function main(): Promise<void> {
       "user.write",
       "role.read",
       "role.write",
-      "audit.read"
+      "audit.read",
+      "property.read",
+      "property.write",
+      "owner.read",
+      "owner.write",
+      "vendor.read",
+      "vendor.write"
     ],
-    operations: ["organization.read", "user.read", "role.read", "audit.read"],
+    operations: [
+      "organization.read",
+      "property.read",
+      "property.write",
+      "owner.read",
+      "owner.write",
+      "vendor.read",
+      "vendor.write"
+    ],
     owner: ["organization.read"]
   };
 
@@ -106,24 +126,24 @@ async function main(): Promise<void> {
 
   for (const [roleName, permissionNames] of Object.entries(rolePermissions)) {
     const roleId = roles[roleName as keyof typeof roles];
-    await Promise.all(
-      permissionNames.map(async (permissionName) => {
-        const permissionId = permissionByName.get(permissionName);
-        if (!permissionId) {
-          return;
-        }
-        await prisma.rolePermission.upsert({
-          where: {
-            roleId_permissionId: {
-              roleId,
-              permissionId
-            }
-          },
-          update: {},
-          create: { roleId, permissionId }
+    const resolvedPermissionIds = permissionNames
+      .map((permissionName) => permissionByName.get(permissionName))
+      .filter((permissionId): permissionId is string => Boolean(permissionId));
+
+    await prisma.$transaction(async (tx) => {
+      await tx.rolePermission.deleteMany({
+        where: { roleId }
+      });
+      if (resolvedPermissionIds.length > 0) {
+        await tx.rolePermission.createMany({
+          data: resolvedPermissionIds.map((permissionId) => ({
+            roleId,
+            permissionId
+          })),
+          skipDuplicates: true
         });
-      })
-    );
+      }
+    });
   }
 
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@vivanta.local";

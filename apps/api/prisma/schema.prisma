@@ -27,6 +27,28 @@ enum UserStatus {
   INVITED
 }
 
+enum PropertyStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum PropertyType {
+  RESIDENTIAL
+  COMMERCIAL
+  MIXED_USE
+  INDUSTRIAL
+  LAND
+  OTHER
+}
+
+enum OccupancyStatus {
+  VACANT
+  OCCUPIED
+  RESERVED
+  UNAVAILABLE
+}
+
 model Organization {
   id          String                @id @default(uuid())
   name        String
@@ -37,6 +59,9 @@ model Organization {
   users       User[]
   roles       Role[]
   auditEvents AuditEvent[]
+  properties  Property[]
+  owners      Owner[]
+  vendors     Vendor[]
 }
 
 model User {
@@ -54,6 +79,7 @@ model User {
   organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   roleAssignments      UserRoleAssignment[]
   actorForAuditEvents  AuditEvent[]         @relation("AuditActor")
+  managedProperties    Property[]           @relation("PropertyManager")
 
   @@index([organizationId])
 }
@@ -118,4 +144,117 @@ model AuditEvent {
   @@index([actorUserId])
   @@index([actionType])
   @@index([entityType, entityId])
+}
+
+model Property {
+  id             String         @id @default(uuid())
+  organizationId String
+  propertyCode   String
+  name           String
+  street         String?
+  city           String?
+  postalCode     String?
+  countryCode    String?
+  status         PropertyStatus @default(ACTIVE)
+  propertyType   PropertyType
+  managerUserId  String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  managerUser    User?          @relation("PropertyManager", fields: [managerUserId], references: [id], onDelete: SetNull)
+  buildings      Building[]
+  units          Unit[]
+  ownerLinks     PropertyOwnerLink[]
+
+  @@unique([organizationId, propertyCode])
+  @@index([organizationId])
+  @@index([managerUserId])
+}
+
+model Building {
+  id           String   @id @default(uuid())
+  propertyId   String
+  name         String?
+  buildingCode String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  units        Unit[]
+
+  @@unique([propertyId, buildingCode])
+  @@index([propertyId])
+}
+
+model Unit {
+  id              String          @id @default(uuid())
+  propertyId      String
+  buildingId      String?
+  unitNumber      String
+  floorLabel      String?
+  unitType        String?
+  squareMeters    Float?
+  bedroomCount    Int?
+  bathroomCount   Float?
+  occupancyStatus OccupancyStatus @default(VACANT)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  property        Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  building        Building?       @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+
+  @@unique([propertyId, unitNumber])
+  @@index([propertyId])
+  @@index([buildingId])
+}
+
+model Owner {
+  id             String             @id @default(uuid())
+  organizationId String
+  displayName    String
+  email          String?
+  phone          String?
+  isCompany      Boolean            @default(false)
+  status         UserStatus         @default(ACTIVE)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  propertyLinks  PropertyOwnerLink[]
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@index([displayName])
+}
+
+model PropertyOwnerLink {
+  propertyId           String
+  ownerId              String
+  ownershipPercentage  Float?
+  startDate            DateTime?
+  endDate              DateTime?
+  isPrimaryContact     Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  property             Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  owner                Owner     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@id([propertyId, ownerId])
+  @@index([ownerId])
+}
+
+model Vendor {
+  id             String       @id @default(uuid())
+  organizationId String
+  name           String
+  vendorType     String?
+  email          String?
+  phone          String?
+  tradeCategory  String?
+  serviceRegions String[]     @default([])
+  taxId          String?
+  status         UserStatus   @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([tradeCategory])
+  @@index([name])
 }
