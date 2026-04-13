@@ -39,7 +39,15 @@ async function main(): Promise<void> {
       ["document.reprocess", "Request document reprocessing"],
       ["communication.read", "Read communication threads and messages"],
       ["communication.write", "Create/update communication threads and messages"],
-      ["communication.assign", "Assign communication threads"]
+      ["communication.assign", "Assign communication threads"],
+      ["case.read", "Read operational cases"],
+      ["case.write", "Create/update operational cases"],
+      ["case.assign", "Assign operational cases"],
+      ["task.read", "Read operational tasks"],
+      ["task.write", "Create/update operational tasks"],
+      ["workorder.read", "Read work orders"],
+      ["workorder.write", "Create/update work orders"],
+      ["workorder.assign", "Assign work order vendors"]
     ].map(([permissionName, description]) =>
       prisma.permission.upsert({
         where: { permissionName },
@@ -118,7 +126,15 @@ async function main(): Promise<void> {
       "document.reprocess",
       "communication.read",
       "communication.write",
-      "communication.assign"
+      "communication.assign",
+      "case.read",
+      "case.write",
+      "case.assign",
+      "task.read",
+      "task.write",
+      "workorder.read",
+      "workorder.write",
+      "workorder.assign"
     ],
     operations: [
       "organization.read",
@@ -134,7 +150,15 @@ async function main(): Promise<void> {
       "document.reprocess",
       "communication.read",
       "communication.write",
-      "communication.assign"
+      "communication.assign",
+      "case.read",
+      "case.write",
+      "case.assign",
+      "task.read",
+      "task.write",
+      "workorder.read",
+      "workorder.write",
+      "workorder.assign"
     ],
     owner: ["organization.read"]
   };
