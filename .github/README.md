@@ -56,8 +56,9 @@ This project is a practical foundation for:
 
 ### Frontend
 
-- Next.js app exists as a placeholder surface (`apps/web`)
-- not yet implemented as full product UI
+- Next.js app exists as an initial UI surface (`apps/web`)
+- current implementation is minimal and backend-first
+- full internal operations UI and portal experience are not yet implemented
 
 ## Implemented Modules
 
