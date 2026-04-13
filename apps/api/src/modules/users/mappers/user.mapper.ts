@@ -7,6 +7,7 @@ export class UserMapper {
     return {
       id: user.id,
       organizationId: user.organizationId,
+      ownerId: user.ownerId,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
@@ -18,4 +19,3 @@ export class UserMapper {
     };
   }
 }
-

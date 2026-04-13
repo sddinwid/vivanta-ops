@@ -3,6 +3,7 @@ import {
   IsEnum,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength
 } from "class-validator";
@@ -34,4 +35,8 @@ export class CreateUserDto {
   @IsString()
   @MinLength(8)
   password?: string;
+
+  @IsOptional()
+  @IsUUID("4")
+  ownerId?: string;
 }

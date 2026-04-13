@@ -199,6 +199,7 @@ model Organization {
 model User {
   id                   String               @id @default(uuid())
   organizationId       String
+  ownerId              String?
   email                String               @unique
   passwordHash         String
   firstName            String
@@ -209,6 +210,7 @@ model User {
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner                Owner?               @relation("OwnerPortalUsers", fields: [ownerId], references: [id], onDelete: SetNull)
   roleAssignments      UserRoleAssignment[]
   actorForAuditEvents  AuditEvent[]         @relation("AuditActor")
   managedProperties    Property[]           @relation("PropertyManager")
@@ -221,6 +223,7 @@ model User {
   initiatedApprovalFlows ApprovalFlow[]     @relation("ApprovalFlowInitiatedBy")
 
   @@index([organizationId])
+  @@index([ownerId])
 }
 
 model Role {
@@ -360,6 +363,7 @@ model Owner {
   updatedAt      DateTime           @updatedAt
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   propertyLinks  PropertyOwnerLink[]
+  portalUsers    User[]             @relation("OwnerPortalUsers")
 
   @@unique([organizationId, email])
   @@index([organizationId])

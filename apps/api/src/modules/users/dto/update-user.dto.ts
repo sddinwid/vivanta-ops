@@ -38,5 +38,8 @@ export class UpdateUserDto {
   @IsString()
   @MinLength(8)
   password?: string;
-}
 
+  @IsOptional()
+  @IsUUID("4")
+  ownerId?: string | null;
+}

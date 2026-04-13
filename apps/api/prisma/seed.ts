@@ -55,7 +55,8 @@ async function main(): Promise<void> {
       ["approval.read", "Read approval flows and steps"],
       ["approval.write", "Act on approval flows"],
       ["workflow.read", "Read workflow runs and workflow events"],
-      ["workflow.write", "Control workflow retry/cancel actions"]
+      ["workflow.write", "Control workflow retry/cancel actions"],
+      ["portal.read", "Read owner-safe portal projections"]
     ].map(([permissionName, description]) =>
       prisma.permission.upsert({
         where: { permissionName },
@@ -165,7 +166,8 @@ async function main(): Promise<void> {
       "approval.read",
       "approval.write",
       "workflow.read",
-      "workflow.write"
+      "workflow.write",
+      "portal.read"
     ],
     operations: [
       "organization.read",
@@ -206,7 +208,7 @@ async function main(): Promise<void> {
       "approval.write",
       "workflow.read"
     ],
-    owner: ["organization.read"]
+    owner: ["organization.read", "portal.read"]
   };
 
   const roles = {
