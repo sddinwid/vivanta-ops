@@ -56,7 +56,10 @@ async function main(): Promise<void> {
       ["approval.write", "Act on approval flows"],
       ["workflow.read", "Read workflow runs and workflow events"],
       ["workflow.write", "Control workflow retry/cancel actions"],
-      ["portal.read", "Read owner-safe portal projections"]
+      ["portal.read", "Read owner-safe portal projections"],
+      ["ai.read", "Read AI runs, suggestions, and AI metadata"],
+      ["ai.write", "Create AI runs and apply AI suggestions"],
+      ["ai.admin", "Manage AI provider and prompt configuration"]
     ].map(([permissionName, description]) =>
       prisma.permission.upsert({
         where: { permissionName },
@@ -167,7 +170,10 @@ async function main(): Promise<void> {
       "approval.write",
       "workflow.read",
       "workflow.write",
-      "portal.read"
+      "portal.read",
+      "ai.read",
+      "ai.write",
+      "ai.admin"
     ],
     operations: [
       "organization.read",
@@ -196,7 +202,8 @@ async function main(): Promise<void> {
       "invoice.write",
       "invoice.review",
       "approval.read",
-      "workflow.read"
+      "workflow.read",
+      "ai.read"
     ],
     finance: [
       "organization.read",
@@ -206,7 +213,8 @@ async function main(): Promise<void> {
       "invoice.approve",
       "approval.read",
       "approval.write",
-      "workflow.read"
+      "workflow.read",
+      "ai.read"
     ],
     owner: ["organization.read", "portal.read"]
   };
