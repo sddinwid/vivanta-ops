@@ -124,6 +124,43 @@ enum WorkOrderStatus {
   CANCELLED
 }
 
+enum InvoiceApprovalStatus {
+  DRAFT
+  PENDING_REVIEW
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+enum AccountingExportStatus {
+  EXPORT_REQUESTED
+  EXPORTED_MOCK
+  EXPORT_FAILED
+}
+
+enum ApprovalTargetEntityType {
+  INVOICE
+}
+
+enum ApprovalFlowStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+enum ApprovalStepStatus {
+  PENDING
+  COMPLETED
+}
+
+enum ApprovalDecision {
+  APPROVE
+  REJECT
+  REQUEST_CHANGES
+}
+
 model Organization {
   id          String                @id @default(uuid())
   name        String
@@ -141,6 +178,8 @@ model Organization {
   communicationThreads CommunicationThread[]
   cases       Case[]
   tasks       Task[]
+  invoices    Invoice[]
+  approvalFlows ApprovalFlow[]
 }
 
 model User {
@@ -165,6 +204,7 @@ model User {
   createdCases        Case[]                @relation("CaseCreatedBy")
   assignedCases       Case[]                @relation("CaseAssignedTo")
   assignedTasks       Task[]                @relation("TaskAssignedTo")
+  initiatedApprovalFlows ApprovalFlow[]     @relation("ApprovalFlowInitiatedBy")
 
   @@index([organizationId])
 }
@@ -251,6 +291,7 @@ model Property {
   units          Unit[]
   ownerLinks     PropertyOwnerLink[]
   cases          Case[]
+  invoices       Invoice[]
 
   @@unique([organizationId, propertyCode])
   @@index([organizationId])
@@ -341,6 +382,7 @@ model Vendor {
   updatedAt      DateTime     @updatedAt
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   workOrders     WorkOrder[]
+  invoices       Invoice[]
 
   @@index([organizationId])
   @@index([tradeCategory])
@@ -367,6 +409,7 @@ model Document {
   links           DocumentLink[]
   attachments     Attachment[]
   messageAttachments MessageAttachment[]
+  sourceInvoices Invoice[] @relation("InvoiceSourceDocument")
 
   @@index([organizationId])
   @@index([uploadedByUserId])
@@ -519,4 +562,89 @@ model WorkOrder {
   @@unique([caseId, workOrderNumber])
   @@index([vendorId])
   @@index([caseId])
+}
+
+model Invoice {
+  id                   String               @id @default(uuid())
+  organizationId       String
+  propertyId           String?
+  vendorId             String?
+  sourceDocumentId     String?
+  invoiceNumber        String?
+  invoiceDate          DateTime?
+  dueDate              DateTime?
+  currencyCode         String
+  subtotalAmount       Decimal?             @db.Decimal(14, 2)
+  taxAmount            Decimal?             @db.Decimal(14, 2)
+  totalAmount          Decimal?             @db.Decimal(14, 2)
+  extractionConfidence Float?
+  duplicateCheckStatus String?
+  approvalStatus       InvoiceApprovalStatus @default(DRAFT)
+  accountingExportStatus AccountingExportStatus?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  property             Property?            @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  vendor               Vendor?              @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  sourceDocument       Document?            @relation("InvoiceSourceDocument", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  lines                InvoiceLine[]
+
+  @@unique([organizationId, vendorId, invoiceNumber])
+  @@index([organizationId])
+  @@index([propertyId])
+  @@index([vendorId])
+  @@index([sourceDocumentId])
+  @@index([approvalStatus])
+}
+
+model InvoiceLine {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  lineNumber  Int
+  description String?
+  quantity    Decimal? @db.Decimal(14, 3)
+  unitPrice   Decimal? @db.Decimal(14, 2)
+  lineTotal   Decimal? @db.Decimal(14, 2)
+  taxRate     Decimal? @db.Decimal(7, 4)
+  createdAt   DateTime @default(now())
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@unique([invoiceId, lineNumber])
+  @@index([invoiceId])
+}
+
+model ApprovalFlow {
+  id               String               @id @default(uuid())
+  organizationId   String
+  targetEntityType ApprovalTargetEntityType
+  targetEntityId   String
+  flowType         String
+  status           ApprovalFlowStatus   @default(PENDING)
+  initiatedByUserId String?
+  startedAt        DateTime             @default(now())
+  completedAt      DateTime?
+  createdAt        DateTime             @default(now())
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  initiatedByUser  User?                @relation("ApprovalFlowInitiatedBy", fields: [initiatedByUserId], references: [id], onDelete: SetNull)
+  steps            ApprovalStep[]
+
+  @@index([organizationId])
+  @@index([targetEntityType, targetEntityId])
+}
+
+model ApprovalStep {
+  id             String             @id @default(uuid())
+  approvalFlowId String
+  stepOrder      Int
+  approverUserId String?
+  approverRole   String?
+  status         ApprovalStepStatus @default(PENDING)
+  decision       ApprovalDecision?
+  decisionReason String?
+  actedAt        DateTime?
+  createdAt      DateTime           @default(now())
+  approvalFlow   ApprovalFlow       @relation(fields: [approvalFlowId], references: [id], onDelete: Cascade)
+
+  @@unique([approvalFlowId, stepOrder])
+  @@index([approvalFlowId])
 }
