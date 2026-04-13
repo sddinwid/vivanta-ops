@@ -174,6 +174,29 @@ enum WorkflowOrchestrationProvider {
   TEMPORAL
 }
 
+enum AiCapability {
+  GENERAL
+  DOCUMENT_ANALYSIS
+  INVOICE_ANALYSIS
+  COMMUNICATION_ASSIST
+  CASE_ASSIST
+  APPROVAL_ASSIST
+}
+
+enum AiRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum AiSuggestionType {
+  GENERIC
+  FIELD_EXTRACTION
+  CLASSIFICATION
+  ACTION_RECOMMENDATION
+}
+
 model Organization {
   id          String                @id @default(uuid())
   name        String
@@ -194,6 +217,8 @@ model Organization {
   invoices    Invoice[]
   approvalFlows ApprovalFlow[]
   workflowRuns WorkflowRun[]
+  aiProviderConfigs AiProviderConfig[]
+  aiRuns      AiRun[]
 }
 
 model User {
@@ -221,6 +246,8 @@ model User {
   assignedCases       Case[]                @relation("CaseAssignedTo")
   assignedTasks       Task[]                @relation("TaskAssignedTo")
   initiatedApprovalFlows ApprovalFlow[]     @relation("ApprovalFlowInitiatedBy")
+  aiRunsCreated       AiRun[]               @relation("AiRunCreatedBy")
+  aiSuggestionsApplied AiSuggestion[]       @relation("AiSuggestionAppliedBy")
 
   @@index([organizationId])
   @@index([ownerId])
@@ -698,4 +725,84 @@ model WorkflowEvent {
   workflowRun  WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
 
   @@index([workflowRunId])
+}
+
+model AiProviderConfig {
+  id             String       @id @default(uuid())
+  organizationId String?
+  providerName   String
+  modelName      String
+  capability     AiCapability
+  isEnabled      Boolean      @default(true)
+  settingsJson   Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([capability])
+}
+
+model AiPromptTemplate {
+  id                 String      @id @default(uuid())
+  templateKey        String
+  capability         AiCapability
+  version            Int
+  systemPrompt       String
+  userPromptTemplate String
+  isActive           Boolean     @default(true)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@unique([templateKey, version])
+  @@index([capability, isActive])
+}
+
+model AiRun {
+  id               String       @id @default(uuid())
+  organizationId   String
+  capability       AiCapability
+  providerName     String
+  modelName        String
+  promptTemplateId String?
+  targetEntityType String?
+  targetEntityId   String?
+  status           AiRunStatus  @default(PENDING)
+  inputJson        Json?
+  outputJson       Json?
+  confidenceScore  Float?
+  latencyMs        Int?
+  errorCode        String?
+  errorMessage     String?
+  createdByUserId  String?
+  createdAt        DateTime     @default(now())
+  completedAt      DateTime?
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  promptTemplate   AiPromptTemplate? @relation(fields: [promptTemplateId], references: [id], onDelete: SetNull)
+  createdByUser    User?        @relation("AiRunCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  suggestions      AiSuggestion[]
+
+  @@index([organizationId])
+  @@index([capability])
+  @@index([status])
+  @@index([targetEntityType, targetEntityId])
+}
+
+model AiSuggestion {
+  id               String           @id @default(uuid())
+  aiRunId          String
+  suggestionType   AiSuggestionType
+  targetEntityType String?
+  targetEntityId   String?
+  suggestionJson   Json
+  confidenceScore  Float?
+  isApplied        Boolean          @default(false)
+  appliedAt        DateTime?
+  appliedByUserId  String?
+  createdAt        DateTime         @default(now())
+  aiRun            AiRun            @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
+  appliedByUser    User?            @relation("AiSuggestionAppliedBy", fields: [appliedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([aiRunId])
+  @@index([targetEntityType, targetEntityId])
 }
