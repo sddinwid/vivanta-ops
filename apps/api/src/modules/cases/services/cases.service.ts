@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { CaseStatus, OperationalPriority } from "@prisma/client";
 import { AuditService } from "../../audit/services/audit.service";
 import { AssignCaseDto } from "../dto/assign-case.dto";
@@ -10,14 +10,18 @@ import { CaseMapper } from "../mappers/case.mapper";
 import { CasesRepository } from "../repositories/cases.repository";
 import { CaseAssignmentService } from "./case-assignment.service";
 import { CaseStatusService } from "./case-status.service";
+import { WorkflowFacadeService } from "../../workflows/services/workflow-facade.service";
 
 @Injectable()
 export class CasesService {
+  private readonly logger = new Logger(CasesService.name);
+
   constructor(
     private readonly casesRepository: CasesRepository,
     private readonly caseAssignmentService: CaseAssignmentService,
     private readonly caseStatusService: CaseStatusService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly workflowFacadeService: WorkflowFacadeService
   ) {}
 
   async list(organizationId: string, filters: CaseFiltersDto) {
@@ -77,6 +81,18 @@ export class CasesService {
       newValues: CaseMapper.toResponse(item),
       metadata: { requestId }
     });
+    try {
+      await this.workflowFacadeService.startCaseLifecycleWorkflow({
+        organizationId,
+        caseId: item.id,
+        actorUserId,
+        requestId
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Case workflow visibility hook failed for caseId=${item.id}: ${error instanceof Error ? error.message : "unknown error"}`
+      );
+    }
 
     return CaseMapper.toResponse(item);
   }

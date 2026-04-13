@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException
 } from "@nestjs/common";
 import {
@@ -18,15 +19,19 @@ import { AttachmentsRepository } from "../repositories/attachments.repository";
 import { DocumentsRepository } from "../repositories/documents.repository";
 import { DocumentLinkingService } from "./document-linking.service";
 import { DocumentStorageService } from "./document-storage.service";
+import { WorkflowFacadeService } from "../../workflows/services/workflow-facade.service";
 
 @Injectable()
 export class DocumentsService {
+  private readonly logger = new Logger(DocumentsService.name);
+
   constructor(
     private readonly documentsRepository: DocumentsRepository,
     private readonly attachmentsRepository: AttachmentsRepository,
     private readonly documentStorageService: DocumentStorageService,
     private readonly documentLinkingService: DocumentLinkingService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly workflowFacadeService: WorkflowFacadeService
   ) {}
 
   async listScoped(organizationId: string, filters: DocumentFiltersDto) {
@@ -136,6 +141,18 @@ export class DocumentsService {
       newValues: DocumentMapper.toResponse(withLinks),
       metadata: { requestId }
     });
+    try {
+      await this.workflowFacadeService.startDocumentIngestionWorkflow({
+        organizationId,
+        documentId: document.id,
+        actorUserId,
+        requestId
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Document workflow visibility hook failed for documentId=${document.id}: ${error instanceof Error ? error.message : "unknown error"}`
+      );
+    }
 
     return DocumentMapper.toResponse(withLinks);
   }

@@ -161,6 +161,19 @@ enum ApprovalDecision {
   REQUEST_CHANGES
 }
 
+enum WorkflowStatus {
+  RUNNING
+  WAITING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum WorkflowOrchestrationProvider {
+  TEMPORAL_STUB
+  TEMPORAL
+}
+
 model Organization {
   id          String                @id @default(uuid())
   name        String
@@ -180,6 +193,7 @@ model Organization {
   tasks       Task[]
   invoices    Invoice[]
   approvalFlows ApprovalFlow[]
+  workflowRuns WorkflowRun[]
 }
 
 model User {
@@ -647,4 +661,37 @@ model ApprovalStep {
 
   @@unique([approvalFlowId, stepOrder])
   @@index([approvalFlowId])
+}
+
+model WorkflowRun {
+  id                    String                        @id @default(uuid())
+  organizationId        String
+  workflowType          String
+  targetEntityType      String?
+  targetEntityId        String?
+  orchestrationProvider WorkflowOrchestrationProvider
+  orchestrationRunId    String?
+  status                WorkflowStatus                @default(RUNNING)
+  startedAt             DateTime                      @default(now())
+  completedAt           DateTime?
+  lastHeartbeatAt       DateTime?
+  createdAt             DateTime                      @default(now())
+  organization          Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  events                WorkflowEvent[]
+
+  @@index([organizationId])
+  @@index([workflowType])
+  @@index([status])
+  @@index([targetEntityType, targetEntityId])
+}
+
+model WorkflowEvent {
+  id           String      @id @default(uuid())
+  workflowRunId String
+  eventType    String
+  eventPayload Json?
+  createdAt    DateTime    @default(now())
+  workflowRun  WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+
+  @@index([workflowRunId])
 }

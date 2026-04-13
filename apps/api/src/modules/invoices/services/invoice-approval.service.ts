@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import {
   AccountingExportStatus,
   InvoiceApprovalStatus
@@ -10,14 +10,18 @@ import { SubmitInvoiceForApprovalDto } from "../dto/submit-invoice-for-approval.
 import { InvoiceMapper } from "../mappers/invoice.mapper";
 import { InvoiceLinesRepository } from "../repositories/invoice-lines.repository";
 import { InvoicesRepository } from "../repositories/invoices.repository";
+import { WorkflowFacadeService } from "../../workflows/services/workflow-facade.service";
 
 @Injectable()
 export class InvoiceApprovalService {
+  private readonly logger = new Logger(InvoiceApprovalService.name);
+
   constructor(
     private readonly approvalsService: ApprovalsService,
     private readonly invoicesRepository: InvoicesRepository,
     private readonly invoiceLinesRepository: InvoiceLinesRepository,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly workflowFacadeService: WorkflowFacadeService
   ) {}
 
   async submitForApproval(params: {
@@ -111,6 +115,18 @@ export class InvoiceApprovalService {
       newValues: { approvalStatus: updated.approvalStatus },
       metadata: { requestId, flowId: flow.id, approverUserIds }
     });
+    try {
+      await this.workflowFacadeService.startInvoiceProcessingWorkflow({
+        organizationId,
+        invoiceId,
+        actorUserId,
+        requestId
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Invoice workflow visibility hook failed for invoiceId=${invoiceId}: ${error instanceof Error ? error.message : "unknown error"}`
+      );
+    }
     return InvoiceMapper.toResponse(updated);
   }
 
@@ -149,4 +165,3 @@ export class InvoiceApprovalService {
     return InvoiceMapper.toResponse(updated);
   }
 }
-

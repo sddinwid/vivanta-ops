@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException
 } from "@nestjs/common";
 import {
@@ -22,16 +23,20 @@ import { MessageAttachmentsRepository } from "../repositories/message-attachment
 import { MessagesRepository } from "../repositories/messages.repository";
 import { CommunicationAssignmentService } from "./communication-assignment.service";
 import { CommunicationLinkingService } from "./communication-linking.service";
+import { WorkflowFacadeService } from "../../workflows/services/workflow-facade.service";
 
 @Injectable()
 export class CommunicationsService {
+  private readonly logger = new Logger(CommunicationsService.name);
+
   constructor(
     private readonly communicationsRepository: CommunicationsRepository,
     private readonly messagesRepository: MessagesRepository,
     private readonly messageAttachmentsRepository: MessageAttachmentsRepository,
     private readonly communicationAssignmentService: CommunicationAssignmentService,
     private readonly communicationLinkingService: CommunicationLinkingService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly workflowFacadeService: WorkflowFacadeService
   ) {}
 
   async listThreads(
@@ -113,6 +118,18 @@ export class CommunicationsService {
       newValues: CommunicationMapper.toResponse(thread),
       metadata: { requestId }
     });
+    try {
+      await this.workflowFacadeService.startCommunicationTriageWorkflow({
+        organizationId,
+        communicationThreadId: thread.id,
+        actorUserId,
+        requestId
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Communication workflow visibility hook failed for threadId=${thread.id}: ${error instanceof Error ? error.message : "unknown error"}`
+      );
+    }
 
     if (dto.initialMessage) {
       await this.createMessage({
@@ -323,4 +340,3 @@ export class CommunicationsService {
     return thread;
   }
 }
-

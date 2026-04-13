@@ -4,6 +4,7 @@ import { PermissionsGuard } from "../../common/guards/permissions.guard";
 import { PrismaModule } from "../../database/prisma/prisma.module";
 import { AuditModule } from "../audit/audit.module";
 import { ApprovalsModule } from "../approvals/approvals.module";
+import { WorkflowsModule } from "../workflows/workflows.module";
 import { InvoicesController } from "./controllers/invoices.controller";
 import { InvoiceMapper } from "./mappers/invoice.mapper";
 import { InvoiceLinesRepository } from "./repositories/invoice-lines.repository";
@@ -13,7 +14,7 @@ import { InvoiceReviewService } from "./services/invoice-review.service";
 import { InvoicesService } from "./services/invoices.service";
 
 @Module({
-  imports: [PrismaModule, AuditModule, ApprovalsModule],
+  imports: [PrismaModule, AuditModule, ApprovalsModule, WorkflowsModule],
   controllers: [InvoicesController],
   providers: [
     InvoicesService,
