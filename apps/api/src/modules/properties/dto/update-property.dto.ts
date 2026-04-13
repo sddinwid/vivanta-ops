@@ -1,0 +1,57 @@
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  MaxLength,
+  MinLength
+} from "class-validator";
+import { PropertyStatus, PropertyType } from "@prisma/client";
+
+export class UpdatePropertyDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(40)
+  propertyCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(200)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  street?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  city?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  postalCode?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @Length(2, 2)
+  countryCode?: string | null;
+
+  @IsOptional()
+  @IsEnum(PropertyStatus)
+  status?: PropertyStatus;
+
+  @IsOptional()
+  @IsEnum(PropertyType)
+  propertyType?: PropertyType;
+
+  @IsOptional()
+  @IsUUID("4")
+  managerUserId?: string | null;
+}
+
