@@ -32,7 +32,11 @@ async function main(): Promise<void> {
       ["owner.read", "Read owner records and ownership links"],
       ["owner.write", "Create/update owner records and ownership links"],
       ["vendor.read", "Read vendor directory records"],
-      ["vendor.write", "Create/update vendor directory records"]
+      ["vendor.write", "Create/update vendor directory records"],
+      ["document.read", "Read document metadata and linked records"],
+      ["document.write", "Upload and update document metadata"],
+      ["document.link", "Link/unlink documents to operational entities"],
+      ["document.reprocess", "Request document reprocessing"]
     ].map(([permissionName, description]) =>
       prisma.permission.upsert({
         where: { permissionName },
@@ -104,7 +108,11 @@ async function main(): Promise<void> {
       "owner.read",
       "owner.write",
       "vendor.read",
-      "vendor.write"
+      "vendor.write",
+      "document.read",
+      "document.write",
+      "document.link",
+      "document.reprocess"
     ],
     operations: [
       "organization.read",
@@ -113,7 +121,11 @@ async function main(): Promise<void> {
       "owner.read",
       "owner.write",
       "vendor.read",
-      "vendor.write"
+      "vendor.write",
+      "document.read",
+      "document.write",
+      "document.link",
+      "document.reprocess"
     ],
     owner: ["organization.read"]
   };
