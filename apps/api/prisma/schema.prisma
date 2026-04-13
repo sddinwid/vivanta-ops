@@ -49,6 +49,21 @@ enum OccupancyStatus {
   UNAVAILABLE
 }
 
+enum DocumentIngestionStatus {
+  UPLOADED
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+  REPROCESSING_REQUESTED
+}
+
+enum DocumentLinkedEntityType {
+  PROPERTY
+  OWNER
+  VENDOR
+}
+
 model Organization {
   id          String                @id @default(uuid())
   name        String
@@ -62,6 +77,7 @@ model Organization {
   properties  Property[]
   owners      Owner[]
   vendors     Vendor[]
+  documents   Document[]
 }
 
 model User {
@@ -80,6 +96,7 @@ model User {
   roleAssignments      UserRoleAssignment[]
   actorForAuditEvents  AuditEvent[]         @relation("AuditActor")
   managedProperties    Property[]           @relation("PropertyManager")
+  uploadedDocuments    Document[]           @relation("DocumentUploadedBy")
 
   @@index([organizationId])
 }
@@ -257,4 +274,53 @@ model Vendor {
   @@index([organizationId])
   @@index([tradeCategory])
   @@index([name])
+}
+
+model Document {
+  id              String                  @id @default(uuid())
+  organizationId  String
+  storageKey      String
+  fileName        String
+  mimeType        String?
+  fileSizeBytes   Int?
+  sourceType      String?
+  sourceReference String?
+  documentType    String?
+  ingestionStatus DocumentIngestionStatus @default(UPLOADED)
+  checksumSha256  String?
+  uploadedByUserId String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  organization    Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedByUser  User?                   @relation("DocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  links           DocumentLink[]
+  attachments     Attachment[]
+
+  @@index([organizationId])
+  @@index([uploadedByUserId])
+  @@index([documentType])
+}
+
+model DocumentLink {
+  documentId       String
+  linkedEntityType DocumentLinkedEntityType
+  linkedEntityId   String
+  linkRole         String?
+  createdAt        DateTime                 @default(now())
+  document         Document                 @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, linkedEntityType, linkedEntityId])
+  @@index([linkedEntityType, linkedEntityId])
+}
+
+model Attachment {
+  id                    String    @id @default(uuid())
+  documentId            String
+  attachmentContextType String
+  attachmentContextId   String
+  createdAt             DateTime  @default(now())
+  document              Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([attachmentContextType, attachmentContextId])
 }
