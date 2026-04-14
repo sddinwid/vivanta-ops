@@ -41,13 +41,21 @@ export class AiPromptService {
     });
   }
 
-  async resolvePromptTemplate(params: { capability: AiCapability; templateId?: string }) {
+  async resolvePromptTemplate(params: {
+    capability: AiCapability;
+    templateId?: string;
+    templateKey?: string;
+  }) {
     if (params.templateId) {
       const byId = await this.aiPromptTemplatesRepository.findById(params.templateId);
       if (!byId) {
         throw new NotFoundException("AI prompt template not found");
       }
       return byId;
+    }
+    // Allow callers to target a specific template family even if multiple templates share a capability.
+    if (params.templateKey) {
+      return this.aiPromptTemplatesRepository.findActiveByTemplateKey(params.templateKey);
     }
     return this.aiPromptTemplatesRepository.findActiveByCapability(params.capability);
   }

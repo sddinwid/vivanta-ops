@@ -21,7 +21,9 @@ import { MessageMapper } from "../mappers/message.mapper";
 import { CommunicationsRepository } from "../repositories/communications.repository";
 import { MessageAttachmentsRepository } from "../repositories/message-attachments.repository";
 import { MessagesRepository } from "../repositories/messages.repository";
+import { AiSuggestionMapper } from "../../ai/mappers/ai-suggestion.mapper";
 import { CommunicationAssignmentService } from "./communication-assignment.service";
+import { CommunicationAiService } from "./communication-ai.service";
 import { CommunicationLinkingService } from "./communication-linking.service";
 import { WorkflowFacadeService } from "../../workflows/services/workflow-facade.service";
 
@@ -35,6 +37,7 @@ export class CommunicationsService {
     private readonly messageAttachmentsRepository: MessageAttachmentsRepository,
     private readonly communicationAssignmentService: CommunicationAssignmentService,
     private readonly communicationLinkingService: CommunicationLinkingService,
+    private readonly communicationAiService: CommunicationAiService,
     private readonly auditService: AuditService,
     private readonly workflowFacadeService: WorkflowFacadeService
   ) {}
@@ -139,6 +142,21 @@ export class CommunicationsService {
         dto: dto.initialMessage,
         requestId
       });
+    } else {
+      // Assistive-only: triage + summary suggestions; never auto-mutate thread state.
+      void this.communicationAiService
+        .runAssistiveTriageAndSummary({
+          organizationId,
+          actorUserId,
+          threadId: thread.id,
+          trigger: "thread_create",
+          requestId
+        })
+        .catch((error) => {
+          this.logger.warn(
+            `Communication AI assist failed for threadId=${thread.id}: ${error instanceof Error ? error.message : "unknown error"}`
+          );
+        });
     }
 
     return CommunicationMapper.toResponse(thread);
@@ -297,10 +315,75 @@ export class CommunicationsService {
       metadata: { requestId, threadId }
     });
 
+    // Assistive-only: triage + summary suggestions; never auto-mutate thread state.
+    void this.communicationAiService
+      .runAssistiveTriageAndSummary({
+        organizationId,
+        actorUserId,
+        threadId,
+        trigger: "message_create",
+        requestId
+      })
+      .catch((error) => {
+        this.logger.warn(
+          `Communication AI assist failed for threadId=${threadId}: ${error instanceof Error ? error.message : "unknown error"}`
+        );
+      });
+
     return MessageMapper.toResponse({
       ...message,
       attachments
     });
+  }
+
+  async listAiSuggestionsScoped(params: {
+    organizationId: string;
+    threadId: string;
+    limit?: number;
+  }) {
+    const suggestions = await this.communicationAiService.listThreadSuggestions(params);
+    return {
+      data: {
+        triage: suggestions.triage.map(AiSuggestionMapper.toResponse),
+        summary: suggestions.summary.map(AiSuggestionMapper.toResponse)
+      },
+      meta: {
+        total: suggestions.triage.length + suggestions.summary.length
+      }
+    };
+  }
+
+  async applyTriageSuggestionScoped(params: {
+    organizationId: string;
+    actorUserId: string;
+    threadId: string;
+    suggestionId: string;
+    requestId?: string;
+    note?: string;
+  }) {
+    const result = await this.communicationAiService.applyTriageSuggestion(params);
+    return {
+      data: {
+        thread: CommunicationMapper.toResponse(result.thread),
+        suggestionId: result.suggestionId,
+        appliedNow: result.appliedNow,
+        priorityChanged: result.priorityChanged
+      }
+    };
+  }
+
+  async applySummarySuggestionScoped(params: {
+    organizationId: string;
+    actorUserId: string;
+    threadId: string;
+    suggestionId: string;
+    requestId?: string;
+    note?: string;
+  }) {
+    const result = await this.communicationAiService.applySummarySuggestion(params);
+    return {
+      data: result
+    };
   }
 
   async queueInbox(organizationId: string) {
