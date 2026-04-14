@@ -11,14 +11,18 @@ import {
   UseGuards
 } from "@nestjs/common";
 import { CurrentUser } from "../../../common/decorators/current-user.decorator";
+import { RequireAnyPermissions } from "../../../common/decorators/require-any-permissions.decorator";
 import { RequirePermissions } from "../../../common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "../../../common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "../../../common/guards/permissions.guard";
 import { RequestIdentity } from "../../../common/request-context/request-context.types";
+import { ApprovalAiService } from "../../approvals/services/approval-ai.service";
+import { AiSuggestionMapper } from "../../ai/mappers/ai-suggestion.mapper";
 import { CreateInvoiceDto } from "../dto/create-invoice.dto";
 import { CreateInvoiceLineDto } from "../dto/create-invoice-line.dto";
 import { ExportInvoiceDto } from "../dto/export-invoice.dto";
 import { InvoiceFiltersDto } from "../dto/invoice-filters.dto";
+import { ApplyInvoiceRoutingSuggestionDto } from "../dto/apply-invoice-routing-suggestion.dto";
 import { RejectInvoiceDto } from "../dto/reject-invoice.dto";
 import { SubmitInvoiceForApprovalDto } from "../dto/submit-invoice-for-approval.dto";
 import { SubmitInvoiceForReviewDto } from "../dto/submit-invoice-for-review.dto";
@@ -33,7 +37,8 @@ export class InvoicesController {
   constructor(
     private readonly invoicesService: InvoicesService,
     private readonly invoiceReviewService: InvoiceReviewService,
-    private readonly invoiceApprovalService: InvoiceApprovalService
+    private readonly invoiceApprovalService: InvoiceApprovalService,
+    private readonly approvalAiService: ApprovalAiService
   ) {}
 
   @Get("queues/pending-review")
@@ -85,6 +90,43 @@ export class InvoicesController {
     @Param("invoiceId", new ParseUUIDPipe()) invoiceId: string
   ): Promise<unknown> {
     return this.invoicesService.getById(identity.organizationId, invoiceId);
+  }
+
+  @Get(":invoiceId/ai-suggestions")
+  @RequireAnyPermissions("invoice.read", "ai.read")
+  listAiSuggestions(
+    @CurrentUser() identity: RequestIdentity,
+    @Param("invoiceId", new ParseUUIDPipe()) invoiceId: string
+  ): Promise<unknown> {
+    return this.approvalAiService
+      .listInvoiceRoutingSuggestions({
+        organizationId: identity.organizationId,
+        invoiceId
+      })
+      .then((suggestions) => ({
+        data: {
+          routing: suggestions.map(AiSuggestionMapper.toResponse)
+        },
+        meta: { total: suggestions.length }
+      }));
+  }
+
+  @Post(":invoiceId/apply-routing-suggestion")
+  @RequirePermissions("invoice.review")
+  applyRoutingSuggestion(
+    @CurrentUser() identity: RequestIdentity,
+    @Req() req: { requestId?: string },
+    @Param("invoiceId", new ParseUUIDPipe()) invoiceId: string,
+    @Body() dto: ApplyInvoiceRoutingSuggestionDto
+  ): Promise<unknown> {
+    return this.approvalAiService.applyInvoiceRoutingSuggestion({
+      organizationId: identity.organizationId,
+      actorUserId: identity.userId,
+      invoiceId,
+      suggestionId: dto.suggestionId,
+      note: dto.note,
+      requestId: req.requestId
+    });
   }
 
   @Patch(":invoiceId")
@@ -198,4 +240,3 @@ export class InvoicesController {
     });
   }
 }
-

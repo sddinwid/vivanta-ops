@@ -402,6 +402,33 @@ async function main(): Promise<void> {
       isActive: true
     }
   });
+
+  await prisma.aiPromptTemplate.upsert({
+    where: { templateKey_version: { templateKey: "invoices.approval_routing", version: 1 } },
+    update: {
+      isActive: true
+    },
+    create: {
+      templateKey: "invoices.approval_routing",
+      capability: AiCapability.APPROVAL_ASSIST,
+      version: 1,
+      systemPrompt: [
+        "You are an assistive approval-routing recommendation tool for invoices.",
+        "Recommend approver roles/users and a simple flow type based on the invoice context.",
+        "Return JSON only with keys: recommendedApproverRoles, recommendedApproverUserIds, recommendedFlowType, reasoning, confidence.",
+        "recommendedFlowType must be: single_step or multi_step.",
+        "confidence must be a number 0.0 to 1.0.",
+        "Never claim certainty. This output is non-authoritative."
+      ].join("\n"),
+      userPromptTemplate: [
+        "Invoice + approval context (JSON):",
+        "{{inputJson}}",
+        "",
+        "Return JSON only."
+      ].join("\n"),
+      isActive: true
+    }
+  });
 }
 
 void main()
