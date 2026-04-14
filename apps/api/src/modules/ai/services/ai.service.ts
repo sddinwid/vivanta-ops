@@ -7,24 +7,34 @@ import {
 } from "@nestjs/common";
 import {
   AiCapability,
+  AiEvaluationOutcome,
   AiRunStatus,
   AiSuggestionType,
   Prisma
 } from "@prisma/client";
+import { PrismaService } from "../../../database/prisma/prisma.service";
 import { AuditService } from "../../audit/services/audit.service";
+import { AiPromptTemplateFiltersDto } from "../dto/ai-prompt-template-filters.dto";
 import { AiRunFiltersDto } from "../dto/ai-run-filters.dto";
+import { AiRunSummaryFiltersDto } from "../dto/ai-run-summary-filters.dto";
 import { ApplyAiSuggestionDto } from "../dto/apply-ai-suggestion.dto";
+import { AiSuggestionFiltersDto } from "../dto/ai-suggestion-filters.dto";
 import { CreateAiRunDto } from "../dto/create-ai-run.dto";
+import { CreateAiEvaluationDto } from "../dto/create-ai-evaluation.dto";
 import { CreatePromptTemplateDto } from "../dto/create-prompt-template.dto";
 import { CreateProviderConfigDto } from "../dto/create-provider-config.dto";
 import { UpdatePromptTemplateDto } from "../dto/update-prompt-template.dto";
 import { UpdateProviderConfigDto } from "../dto/update-provider-config.dto";
+import { AiEvaluationMapper } from "../mappers/ai-evaluation.mapper";
 import { AiRunMapper } from "../mappers/ai-run.mapper";
+import { AiSuggestionMapper } from "../mappers/ai-suggestion.mapper";
 import { AiRunsRepository } from "../repositories/ai-runs.repository";
+import { AiEvaluationsRepository } from "../repositories/ai-evaluations.repository";
 import { AiSuggestionsRepository } from "../repositories/ai-suggestions.repository";
 import { AiPromptService } from "./ai-prompt.service";
 import { AiProviderService } from "./ai-provider.service";
 import { AiSuggestionService } from "./ai-suggestion.service";
+import { AiCapabilityDisabledError } from "./ai-provider.service";
 
 const VALID_SUGGESTION_TYPES = new Set<string>(Object.values(AiSuggestionType));
 
@@ -33,8 +43,10 @@ export class AiService {
   private readonly logger = new Logger(AiService.name);
 
   constructor(
+    private readonly prisma: PrismaService,
     private readonly aiRunsRepository: AiRunsRepository,
     private readonly aiSuggestionsRepository: AiSuggestionsRepository,
+    private readonly aiEvaluationsRepository: AiEvaluationsRepository,
     private readonly aiProviderService: AiProviderService,
     private readonly aiPromptService: AiPromptService,
     private readonly aiSuggestionService: AiSuggestionService,
@@ -104,7 +116,7 @@ export class AiService {
       templateId: dto.promptTemplateId
     });
 
-    const providerConfig = await this.aiProviderService.resolvePreferredConfig(
+    const providerConfig = await this.aiProviderService.resolveEffectiveConfig(
       organizationId,
       dto.capability
     );
@@ -125,12 +137,13 @@ export class AiService {
       createdByUser: { connect: { id: actorUserId } }
     });
 
-    await this.aiRunsRepository.update(created.id, {
-      status: AiRunStatus.RUNNING
-    });
+      await this.aiRunsRepository.update(created.id, {
+        status: AiRunStatus.RUNNING
+      });
 
     try {
       const providerResponse = await this.aiProviderService.run({
+        organizationId,
         capability: dto.capability,
         systemPrompt: promptTemplate?.systemPrompt ?? this.defaultSystemPrompt(dto.capability),
         userPrompt: this.renderUserPrompt(promptTemplate?.userPromptTemplate, dto.inputJson),
@@ -179,21 +192,261 @@ export class AiService {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown AI provider error";
       this.logger.error(`AI run failed: ${message}`);
+      const isDisabled = error instanceof AiCapabilityDisabledError;
       await this.aiRunsRepository.update(created.id, {
         status: AiRunStatus.FAILED,
-        errorCode: "AI_PROVIDER_ERROR",
+        errorCode: isDisabled ? "AI_DISABLED" : "AI_PROVIDER_ERROR",
         errorMessage: message,
         completedAt: new Date()
       });
+      if (isDisabled) {
+        throw new BadRequestException("AI execution is disabled for this capability");
+      }
       throw new InternalServerErrorException("AI run failed");
     }
   }
 
-  listPromptTemplates() {
-    return this.aiPromptService.listTemplates().then((templates) => ({
+  listPromptTemplates(filters?: AiPromptTemplateFiltersDto) {
+    return this.aiPromptService.listTemplates(filters).then((templates) => ({
       data: templates,
       meta: { total: templates.length }
     }));
+  }
+
+  async listCapabilities(organizationId: string) {
+    const all = Object.values(AiCapability);
+    const configs = await Promise.all(
+      all.map(async (capability) => {
+        const effective = await this.aiProviderService.resolveEffectiveConfig(
+          organizationId,
+          capability
+        );
+        const source = effective
+          ? effective.organizationId
+            ? "organization"
+            : "global"
+          : "fallback";
+        const enabled = effective ? Boolean(effective.isEnabled) : true;
+        return {
+          capability,
+          source,
+          enabled,
+          providerName: effective?.providerName ?? "stub",
+          modelName: effective?.modelName ?? "stub-v1",
+          configId: effective?.id ?? null,
+          configOrganizationId: effective?.organizationId ?? null
+        };
+      })
+    );
+
+    return { data: configs, meta: { total: configs.length } };
+  }
+
+  async getRunsSummary(organizationId: string, filters: AiRunSummaryFiltersDto) {
+    const createdAt =
+      filters.createdFrom || filters.createdTo
+        ? {
+            gte: filters.createdFrom ? new Date(filters.createdFrom) : undefined,
+            lte: filters.createdTo ? new Date(filters.createdTo) : undefined
+          }
+        : undefined;
+
+    const runWhere: Prisma.AiRunWhereInput = {
+      organizationId,
+      capability: filters.capability,
+      createdAt
+    };
+
+    const [totalRuns, completedRuns, failedRuns, runAgg, suggestionsCreated, suggestionsApplied, evaluationsPositive, evaluationsNegative] =
+      await Promise.all([
+        this.prisma.aiRun.count({ where: runWhere }),
+        this.prisma.aiRun.count({ where: { ...runWhere, status: AiRunStatus.COMPLETED } }),
+        this.prisma.aiRun.count({ where: { ...runWhere, status: AiRunStatus.FAILED } }),
+        this.prisma.aiRun.aggregate({
+          where: { ...runWhere, status: AiRunStatus.COMPLETED },
+          _avg: { latencyMs: true, confidenceScore: true }
+        }),
+        this.prisma.aiSuggestion.count({
+          where: {
+            aiRun: runWhere
+          }
+        }),
+        this.prisma.aiSuggestion.count({
+          where: {
+            isApplied: true,
+            aiRun: runWhere
+          }
+        }),
+        this.prisma.aiEvaluation.count({
+          where: {
+            organizationId,
+            outcome: AiEvaluationOutcome.POSITIVE,
+            aiRun: runWhere
+          }
+        }),
+        this.prisma.aiEvaluation.count({
+          where: {
+            organizationId,
+            outcome: AiEvaluationOutcome.NEGATIVE,
+            aiRun: runWhere
+          }
+        })
+      ]);
+
+    return {
+      data: {
+        totalRuns,
+        completedRuns,
+        failedRuns,
+        averageLatencyMs: runAgg._avg.latencyMs ?? null,
+        averageConfidenceScore: runAgg._avg.confidenceScore ?? null,
+        suggestionsCreated,
+        suggestionsApplied,
+        evaluationsPositive,
+        evaluationsNegative
+      }
+    };
+  }
+
+  async listSuggestions(organizationId: string, filters: AiSuggestionFiltersDto) {
+    const suggestions = await this.aiSuggestionsRepository.listByOrganization({
+      organizationId,
+      suggestionType: filters.suggestionType,
+      isApplied: filters.isApplied,
+      targetEntityType: filters.targetEntityType,
+      targetEntityId: filters.targetEntityId,
+      createdFrom: filters.createdFrom,
+      createdTo: filters.createdTo,
+      limit: filters.limit,
+      offset: filters.offset
+    });
+
+    const total = await this.prisma.aiSuggestion.count({
+      where: {
+        suggestionType: filters.suggestionType,
+        isApplied: filters.isApplied,
+        targetEntityType: filters.targetEntityType,
+        targetEntityId: filters.targetEntityId,
+        createdAt:
+          filters.createdFrom || filters.createdTo
+            ? {
+                gte: filters.createdFrom ? new Date(filters.createdFrom) : undefined,
+                lte: filters.createdTo ? new Date(filters.createdTo) : undefined
+              }
+            : undefined,
+        aiRun: { organizationId }
+      }
+    });
+
+    return {
+      data: suggestions.map(AiSuggestionMapper.toResponse),
+      meta: {
+        total,
+        limit: filters.limit ?? 25,
+        offset: filters.offset ?? 0
+      }
+    };
+  }
+
+  async getSuggestionById(organizationId: string, suggestionId: string) {
+    const suggestion = await this.aiSuggestionsRepository.findByIdScoped(
+      suggestionId,
+      organizationId
+    );
+    if (!suggestion) {
+      throw new NotFoundException("AI suggestion not found");
+    }
+    return AiSuggestionMapper.toResponse(suggestion);
+  }
+
+  async listRunEvaluations(organizationId: string, aiRunId: string) {
+    const run = await this.aiRunsRepository.findByIdScoped(aiRunId, organizationId);
+    if (!run) {
+      throw new NotFoundException("AI run not found");
+    }
+    const evaluations = await this.aiEvaluationsRepository.listByRunIdScoped(organizationId, aiRunId);
+    return {
+      data: evaluations.map(AiEvaluationMapper.toResponse),
+      meta: { total: evaluations.length }
+    };
+  }
+
+  async createRunEvaluation(params: {
+    organizationId: string;
+    actorUserId: string;
+    aiRunId: string;
+    dto: CreateAiEvaluationDto;
+    requestId?: string;
+  }) {
+    const run = await this.aiRunsRepository.findByIdScoped(params.aiRunId, params.organizationId);
+    if (!run) {
+      throw new NotFoundException("AI run not found");
+    }
+
+    const created = await this.aiEvaluationsRepository.create({
+      organization: { connect: { id: params.organizationId } },
+      aiRun: { connect: { id: run.id } },
+      targetEntityType: run.targetEntityType,
+      targetEntityId: run.targetEntityId,
+      evaluatorUser: { connect: { id: params.actorUserId } },
+      outcome: params.dto.outcome,
+      score: params.dto.score,
+      notes: params.dto.notes,
+      metadataJson: params.dto.metadataJson
+    });
+
+    await this.auditService.record({
+      organizationId: params.organizationId,
+      actorUserId: params.actorUserId,
+      actionType: "ai.run.evaluated",
+      entityType: "AiEvaluation",
+      entityId: created.id,
+      newValues: AiEvaluationMapper.toResponse(created),
+      metadata: { requestId: params.requestId, aiRunId: run.id }
+    });
+
+    return { data: AiEvaluationMapper.toResponse(created) };
+  }
+
+  async createSuggestionEvaluation(params: {
+    organizationId: string;
+    actorUserId: string;
+    suggestionId: string;
+    dto: CreateAiEvaluationDto;
+    requestId?: string;
+  }) {
+    const suggestion = await this.aiSuggestionsRepository.findByIdScoped(
+      params.suggestionId,
+      params.organizationId
+    );
+    if (!suggestion) {
+      throw new NotFoundException("AI suggestion not found");
+    }
+
+    const created = await this.aiEvaluationsRepository.create({
+      organization: { connect: { id: params.organizationId } },
+      aiRun: { connect: { id: suggestion.aiRunId } },
+      aiSuggestion: { connect: { id: suggestion.id } },
+      targetEntityType: suggestion.targetEntityType,
+      targetEntityId: suggestion.targetEntityId,
+      evaluatorUser: { connect: { id: params.actorUserId } },
+      outcome: params.dto.outcome,
+      score: params.dto.score,
+      notes: params.dto.notes,
+      metadataJson: params.dto.metadataJson
+    });
+
+    await this.auditService.record({
+      organizationId: params.organizationId,
+      actorUserId: params.actorUserId,
+      actionType: "ai.suggestion.evaluated",
+      entityType: "AiEvaluation",
+      entityId: created.id,
+      newValues: AiEvaluationMapper.toResponse(created),
+      metadata: { requestId: params.requestId, suggestionId: suggestion.id, aiRunId: suggestion.aiRunId }
+    });
+
+    return { data: AiEvaluationMapper.toResponse(created) };
   }
 
   async createPromptTemplate(params: {

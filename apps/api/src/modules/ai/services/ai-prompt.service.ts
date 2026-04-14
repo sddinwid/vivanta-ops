@@ -10,8 +10,8 @@ export class AiPromptService {
     private readonly aiPromptTemplatesRepository: AiPromptTemplatesRepository
   ) {}
 
-  listTemplates() {
-    return this.aiPromptTemplatesRepository.list();
+  listTemplates(filters?: { capability?: AiCapability; isActive?: boolean }) {
+    return this.aiPromptTemplatesRepository.list(filters);
   }
 
   createTemplate(dto: CreatePromptTemplateDto) {

@@ -43,4 +43,17 @@ export class AiProviderConfigsRepository {
       orderBy: [{ organizationId: "desc" }, { updatedAt: "desc" }]
     });
   }
+
+  findEffectiveConfig(
+    organizationId: string,
+    capability: AiCapability
+  ): Promise<AiProviderConfig | null> {
+    return this.prisma.aiProviderConfig.findFirst({
+      where: {
+        capability,
+        OR: [{ organizationId }, { organizationId: null }]
+      },
+      orderBy: [{ organizationId: "desc" }, { updatedAt: "desc" }]
+    });
+  }
 }
