@@ -11,10 +11,12 @@ import {
   UseGuards
 } from "@nestjs/common";
 import { CurrentUser } from "../../../common/decorators/current-user.decorator";
+import { RequireAnyPermissions } from "../../../common/decorators/require-any-permissions.decorator";
 import { RequirePermissions } from "../../../common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "../../../common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "../../../common/guards/permissions.guard";
 import { RequestIdentity } from "../../../common/request-context/request-context.types";
+import { ApplyCaseAiSuggestionDto } from "../dto/apply-case-ai-suggestion.dto";
 import { AssignCaseDto } from "../dto/assign-case.dto";
 import { CaseFiltersDto } from "../dto/case-filters.dto";
 import { ChangeCaseStatusDto } from "../dto/change-case-status.dto";
@@ -76,6 +78,38 @@ export class CasesController {
     @Param("caseId", new ParseUUIDPipe()) caseId: string
   ): Promise<unknown> {
     return this.casesService.getById(identity.organizationId, caseId);
+  }
+
+  @Get(":caseId/ai-suggestions")
+  @RequireAnyPermissions("case.read", "ai.read")
+  listAiSuggestions(
+    @CurrentUser() identity: RequestIdentity,
+    @Param("caseId", new ParseUUIDPipe()) caseId: string
+  ): Promise<unknown> {
+    return this.casesService.listAiSuggestionsScoped({
+      organizationId: identity.organizationId,
+      caseId
+    });
+  }
+
+  @Post(":caseId/apply-ai-suggestion")
+  @RequirePermissions("case.write")
+  applyAiSuggestion(
+    @CurrentUser() identity: RequestIdentity,
+    @Req() req: { requestId?: string },
+    @Param("caseId", new ParseUUIDPipe()) caseId: string,
+    @Body() dto: ApplyCaseAiSuggestionDto
+  ): Promise<unknown> {
+    return this.casesService.applyAiSuggestionScoped({
+      organizationId: identity.organizationId,
+      actorUserId: identity.userId,
+      caseId,
+      suggestionId: dto.suggestionId,
+      applyCaseType: dto.applyCaseType,
+      applyPriority: dto.applyPriority,
+      note: dto.note,
+      requestId: req.requestId
+    });
   }
 
   @Patch(":caseId")

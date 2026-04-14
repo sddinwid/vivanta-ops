@@ -136,6 +136,68 @@ export class StubAiProviderService implements AiProvider {
           : "Invoice total suggests standard spend; recommending finance.",
         confidence: highValue || riskKeyword ? 0.78 : 0.62
       };
+    } else if (request.capability === AiCapability.CASE_ASSIST) {
+      const caseNode =
+        input && typeof input === "object" && input["case"] && typeof input["case"] === "object"
+          ? (input["case"] as Record<string, unknown>)
+          : ({} as Record<string, unknown>);
+
+      const title = typeof caseNode["title"] === "string" ? caseNode["title"] : "";
+      const description = typeof caseNode["description"] === "string" ? caseNode["description"] : "";
+      const combined = `${title}\n${description}`.toLowerCase();
+
+      const hasUrgent = /\burgent\b|asap|immediately|right away/.test(combined);
+      const hasMaintenance =
+        /\bleak\b|\bwater\b|\bbroken\b|\brepair\b|\bmold\b|\bheating\b|\bplumbing\b/.test(combined);
+      const hasBilling = /\binvoice\b|\bbilling\b|\bcharge\b|\bpayment\b|\bbill\b|\brefund\b/.test(combined);
+      const hasComplaint = /\bcomplaint\b|\bunhappy\b|\bnoise\b|\bterrible\b|\bnot acceptable\b/.test(combined);
+      const hasLease = /\blease\b|\brent\b|\bcontract\b/.test(combined);
+
+      let recommendedCaseType: string = "general";
+      let recommendedWorkflow: string = "simple";
+      if (hasMaintenance) {
+        recommendedCaseType = "maintenance";
+        recommendedWorkflow = "vendor_dispatch";
+      } else if (hasBilling) {
+        recommendedCaseType = "billing";
+        recommendedWorkflow = "simple";
+      } else if (hasComplaint) {
+        recommendedCaseType = "complaint";
+        recommendedWorkflow = "escalation";
+      } else if (hasLease) {
+        recommendedCaseType = "lease";
+        recommendedWorkflow = "simple";
+      } else {
+        recommendedCaseType = "general";
+        recommendedWorkflow = "simple";
+      }
+
+      let recommendedPriority: string = "low";
+      if (hasUrgent) recommendedPriority = "urgent";
+      else if (hasMaintenance || hasComplaint) recommendedPriority = "high";
+      else if (hasBilling) recommendedPriority = "medium";
+      else recommendedPriority = "low";
+
+      const recommendedNextActions: string[] = [];
+      if (hasMaintenance) recommendedNextActions.push("create_work_order");
+      if (hasBilling) recommendedNextActions.push("request_documents");
+      if (hasComplaint) recommendedNextActions.push("assign_operator");
+      if (recommendedNextActions.length === 0) recommendedNextActions.push("monitor_only");
+
+      output = {
+        recommendedCaseType,
+        recommendedPriority,
+        recommendedNextActions,
+        recommendedWorkflow,
+        reasoning: hasMaintenance
+          ? "Detected maintenance-related keywords in case title/description."
+          : hasBilling
+            ? "Detected billing-related keywords in case title/description."
+            : hasComplaint
+              ? "Detected complaint-related keywords in case title/description."
+              : "No strong signals in stub mode; defaulting to general.",
+        confidence: hasUrgent || hasMaintenance || hasBilling || hasComplaint ? 0.74 : 0.55
+      };
     } else {
       output = {
         provider: request.providerName,

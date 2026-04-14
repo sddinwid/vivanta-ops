@@ -429,6 +429,36 @@ async function main(): Promise<void> {
       isActive: true
     }
   });
+
+  await prisma.aiPromptTemplate.upsert({
+    where: { templateKey_version: { templateKey: "cases.recommendation", version: 1 } },
+    update: {
+      isActive: true
+    },
+    create: {
+      templateKey: "cases.recommendation",
+      capability: AiCapability.CASE_ASSIST,
+      version: 1,
+      systemPrompt: [
+        "You are an assistive case categorization and workflow recommendation tool.",
+        "Analyze the case context and recommend categorization and next actions.",
+        "Return JSON only with keys: recommendedCaseType, recommendedPriority, recommendedNextActions, recommendedWorkflow, reasoning, confidence.",
+        "recommendedCaseType must be one of: maintenance, billing, complaint, lease, general, other.",
+        "recommendedPriority must be one of: low, medium, high, urgent.",
+        "recommendedNextActions must be an array with items from: create_work_order, request_documents, assign_operator, monitor_only.",
+        "recommendedWorkflow must be one of: simple, escalation, vendor_dispatch.",
+        "confidence must be a number 0.0 to 1.0.",
+        "Never claim certainty. This output is non-authoritative."
+      ].join("\n"),
+      userPromptTemplate: [
+        "Case context (JSON):",
+        "{{inputJson}}",
+        "",
+        "Return JSON only."
+      ].join("\n"),
+      isActive: true
+    }
+  });
 }
 
 void main()
