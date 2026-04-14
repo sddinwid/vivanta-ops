@@ -8,7 +8,9 @@ import { CreateCaseDto } from "../dto/create-case.dto";
 import { UpdateCaseDto } from "../dto/update-case.dto";
 import { CaseMapper } from "../mappers/case.mapper";
 import { CasesRepository } from "../repositories/cases.repository";
+import { AiSuggestionMapper } from "../../ai/mappers/ai-suggestion.mapper";
 import { CaseAssignmentService } from "./case-assignment.service";
+import { CaseAiService } from "./case-ai.service";
 import { CaseStatusService } from "./case-status.service";
 import { WorkflowFacadeService } from "../../workflows/services/workflow-facade.service";
 
@@ -20,6 +22,7 @@ export class CasesService {
     private readonly casesRepository: CasesRepository,
     private readonly caseAssignmentService: CaseAssignmentService,
     private readonly caseStatusService: CaseStatusService,
+    private readonly caseAiService: CaseAiService,
     private readonly auditService: AuditService,
     private readonly workflowFacadeService: WorkflowFacadeService
   ) {}
@@ -94,6 +97,21 @@ export class CasesService {
       );
     }
 
+    // Assistive-only: case categorization + workflow recommendations; never auto-mutate case state.
+    void this.caseAiService
+      .runCaseRecommendation({
+        organizationId,
+        actorUserId,
+        caseId: item.id,
+        trigger: "case_create",
+        requestId
+      })
+      .catch((error) => {
+        this.logger.warn(
+          `Case AI assist failed for caseId=${item.id}: ${error instanceof Error ? error.message : "unknown error"}`
+        );
+      });
+
     return CaseMapper.toResponse(item);
   }
 
@@ -161,6 +179,38 @@ export class CasesService {
     });
 
     return CaseMapper.toResponse(updated);
+  }
+
+  async listAiSuggestionsScoped(params: { organizationId: string; caseId: string; limit?: number }) {
+    const suggestions = await this.caseAiService.listCaseSuggestions(params);
+    return {
+      data: {
+        recommendations: suggestions.map(AiSuggestionMapper.toResponse)
+      },
+      meta: { total: suggestions.length }
+    };
+  }
+
+  async applyAiSuggestionScoped(params: {
+    organizationId: string;
+    actorUserId: string;
+    caseId: string;
+    suggestionId: string;
+    applyCaseType?: boolean;
+    applyPriority?: boolean;
+    requestId?: string;
+    note?: string;
+  }) {
+    const result = await this.caseAiService.applyCaseSuggestion(params);
+    return {
+      data: {
+        case: CaseMapper.toResponse(result.case),
+        suggestionId: result.suggestionId,
+        appliedNow: result.appliedNow,
+        appliedFields: result.appliedFields,
+        recommendation: result.recommendation
+      }
+    };
   }
 
   assign(params: {
