@@ -6,6 +6,43 @@ import { PrismaService } from "../../../database/prisma/prisma.service";
 export class AiSuggestionsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  listByOrganization(params: {
+    organizationId: string;
+    suggestionType?: Prisma.AiSuggestionWhereInput["suggestionType"];
+    isApplied?: boolean;
+    targetEntityType?: string;
+    targetEntityId?: string;
+    createdFrom?: string;
+    createdTo?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AiSuggestion[]> {
+    return this.prisma.aiSuggestion.findMany({
+      where: {
+        suggestionType: params.suggestionType,
+        isApplied: params.isApplied,
+        targetEntityType: params.targetEntityType,
+        targetEntityId: params.targetEntityId,
+        createdAt:
+          params.createdFrom || params.createdTo
+            ? {
+                gte: params.createdFrom ? new Date(params.createdFrom) : undefined,
+                lte: params.createdTo ? new Date(params.createdTo) : undefined
+              }
+            : undefined,
+        aiRun: {
+          organizationId: params.organizationId
+        }
+      },
+      include: {
+        aiRun: true
+      },
+      orderBy: { createdAt: "desc" },
+      skip: params.offset,
+      take: params.limit ?? 25
+    });
+  }
+
   listByRunId(aiRunId: string): Promise<AiSuggestion[]> {
     return this.prisma.aiSuggestion.findMany({
       where: { aiRunId },

@@ -6,7 +6,9 @@ import { AuditModule } from "../audit/audit.module";
 import { AiController } from "./controllers/ai.controller";
 import { AiRunMapper } from "./mappers/ai-run.mapper";
 import { AiSuggestionMapper } from "./mappers/ai-suggestion.mapper";
+import { AiEvaluationMapper } from "./mappers/ai-evaluation.mapper";
 import { AiProviderConfigsRepository } from "./repositories/ai-provider-configs.repository";
+import { AiEvaluationsRepository } from "./repositories/ai-evaluations.repository";
 import { AiPromptTemplatesRepository } from "./repositories/ai-prompt-templates.repository";
 import { AiRunsRepository } from "./repositories/ai-runs.repository";
 import { AiSuggestionsRepository } from "./repositories/ai-suggestions.repository";
@@ -27,10 +29,12 @@ import { StubAiProviderService } from "./services/stub-ai-provider.service";
     StubAiProviderService,
     AiRunsRepository,
     AiSuggestionsRepository,
+    AiEvaluationsRepository,
     AiProviderConfigsRepository,
     AiPromptTemplatesRepository,
     AiRunMapper,
     AiSuggestionMapper,
+    AiEvaluationMapper,
     JwtAuthGuard,
     PermissionsGuard
   ],

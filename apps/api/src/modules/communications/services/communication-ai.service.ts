@@ -16,6 +16,7 @@ import { AiProviderService } from "../../ai/services/ai-provider.service";
 import { AiPromptService } from "../../ai/services/ai-prompt.service";
 import { AiRunsRepository } from "../../ai/repositories/ai-runs.repository";
 import { AiSuggestionsRepository } from "../../ai/repositories/ai-suggestions.repository";
+import { AiCapabilityDisabledError } from "../../ai/services/ai-provider.service";
 import { CommunicationsRepository } from "../repositories/communications.repository";
 import { MessagesRepository } from "../repositories/messages.repository";
 
@@ -265,7 +266,7 @@ export class CommunicationAiService {
       templateKey: "communications.triage"
     });
 
-    const providerConfig = await this.aiProviderService.resolvePreferredConfig(
+    const providerConfig = await this.aiProviderService.resolveEffectiveConfig(
       params.organizationId,
       capability
     );
@@ -285,10 +286,11 @@ export class CommunicationAiService {
       createdByUser: { connect: { id: params.actorUserId } }
     });
 
-    await this.aiRunsRepository.update(run.id, { status: AiRunStatus.RUNNING });
+      await this.aiRunsRepository.update(run.id, { status: AiRunStatus.RUNNING });
 
     try {
       const providerResponse = await this.aiProviderService.run({
+        organizationId: params.organizationId,
         capability,
         providerName,
         modelName,
@@ -343,9 +345,10 @@ export class CommunicationAiService {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown AI provider error";
       this.logger.error(`Communication triage AI run failed: ${message}`);
+      const isDisabled = error instanceof AiCapabilityDisabledError;
       await this.aiRunsRepository.update(run.id, {
         status: AiRunStatus.FAILED,
-        errorCode: "AI_PROVIDER_ERROR",
+        errorCode: isDisabled ? "AI_DISABLED" : "AI_PROVIDER_ERROR",
         errorMessage: message,
         completedAt: new Date()
       });
@@ -366,7 +369,7 @@ export class CommunicationAiService {
       templateKey: "communications.summary"
     });
 
-    const providerConfig = await this.aiProviderService.resolvePreferredConfig(
+    const providerConfig = await this.aiProviderService.resolveEffectiveConfig(
       params.organizationId,
       capability
     );
@@ -386,10 +389,11 @@ export class CommunicationAiService {
       createdByUser: { connect: { id: params.actorUserId } }
     });
 
-    await this.aiRunsRepository.update(run.id, { status: AiRunStatus.RUNNING });
+      await this.aiRunsRepository.update(run.id, { status: AiRunStatus.RUNNING });
 
     try {
       const providerResponse = await this.aiProviderService.run({
+        organizationId: params.organizationId,
         capability,
         providerName,
         modelName,
@@ -442,9 +446,10 @@ export class CommunicationAiService {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown AI provider error";
       this.logger.error(`Communication summary AI run failed: ${message}`);
+      const isDisabled = error instanceof AiCapabilityDisabledError;
       await this.aiRunsRepository.update(run.id, {
         status: AiRunStatus.FAILED,
-        errorCode: "AI_PROVIDER_ERROR",
+        errorCode: isDisabled ? "AI_DISABLED" : "AI_PROVIDER_ERROR",
         errorMessage: message,
         completedAt: new Date()
       });
@@ -548,4 +553,3 @@ export class CommunicationAiService {
     return thread;
   }
 }
-

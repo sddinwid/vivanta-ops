@@ -6,6 +6,13 @@ import { AiProviderConfigsRepository } from "../repositories/ai-provider-configs
 import { AiProviderRequest, AiProviderResponse } from "./ai-provider.interface";
 import { StubAiProviderService } from "./stub-ai-provider.service";
 
+export class AiCapabilityDisabledError extends Error {
+  constructor(public readonly capability: AiCapability) {
+    super(`AI execution disabled for capability ${capability}`);
+    this.name = "AiCapabilityDisabledError";
+  }
+}
+
 @Injectable()
 export class AiProviderService {
   constructor(
@@ -56,7 +63,25 @@ export class AiProviderService {
     );
   }
 
+  resolveEffectiveConfig(organizationId: string, capability: AiCapability) {
+    return this.aiProviderConfigsRepository.findEffectiveConfig(organizationId, capability);
+  }
+
+  async isCapabilityEnabled(organizationId: string, capability: AiCapability): Promise<boolean> {
+    const config = await this.resolveEffectiveConfig(organizationId, capability);
+    // No config means "use fallback behavior" (current behavior is stub fallback).
+    if (!config) {
+      return true;
+    }
+    return Boolean(config.isEnabled);
+  }
+
   run(request: AiProviderRequest): Promise<AiProviderResponse> {
-    return this.stubAiProviderService.run(request);
+    return this.isCapabilityEnabled(request.organizationId, request.capability).then((enabled) => {
+      if (!enabled) {
+        throw new AiCapabilityDisabledError(request.capability);
+      }
+      return this.stubAiProviderService.run(request);
+    });
   }
 }

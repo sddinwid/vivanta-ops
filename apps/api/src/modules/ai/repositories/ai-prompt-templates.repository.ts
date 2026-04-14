@@ -6,8 +6,12 @@ import { PrismaService } from "../../../database/prisma/prisma.service";
 export class AiPromptTemplatesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  list() {
+  list(filters?: { capability?: AiCapability; isActive?: boolean }) {
     return this.prisma.aiPromptTemplate.findMany({
+      where: {
+        capability: filters?.capability,
+        isActive: filters?.isActive
+      },
       orderBy: [{ templateKey: "asc" }, { version: "desc" }]
     });
   }

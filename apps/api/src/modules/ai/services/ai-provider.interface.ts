@@ -1,6 +1,7 @@
 import { AiCapability } from "@prisma/client";
 
 export interface AiProviderRequest {
+  organizationId: string;
   capability: AiCapability;
   systemPrompt: string;
   userPrompt: string;

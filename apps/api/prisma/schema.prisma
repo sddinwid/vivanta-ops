@@ -197,6 +197,13 @@ enum AiSuggestionType {
   ACTION_RECOMMENDATION
 }
 
+enum AiEvaluationOutcome {
+  POSITIVE
+  NEGATIVE
+  MIXED
+  NEEDS_REVIEW
+}
+
 model Organization {
   id          String                @id @default(uuid())
   name        String
@@ -219,6 +226,7 @@ model Organization {
   workflowRuns WorkflowRun[]
   aiProviderConfigs AiProviderConfig[]
   aiRuns      AiRun[]
+  aiEvaluations AiEvaluation[]
 }
 
 model User {
@@ -248,6 +256,7 @@ model User {
   initiatedApprovalFlows ApprovalFlow[]     @relation("ApprovalFlowInitiatedBy")
   aiRunsCreated       AiRun[]               @relation("AiRunCreatedBy")
   aiSuggestionsApplied AiSuggestion[]       @relation("AiSuggestionAppliedBy")
+  aiEvaluationsCreated AiEvaluation[]       @relation("AiEvaluationEvaluator")
 
   @@index([organizationId])
   @@index([ownerId])
@@ -781,6 +790,7 @@ model AiRun {
   promptTemplate   AiPromptTemplate? @relation(fields: [promptTemplateId], references: [id], onDelete: SetNull)
   createdByUser    User?        @relation("AiRunCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   suggestions      AiSuggestion[]
+  evaluations      AiEvaluation[]
 
   @@index([organizationId])
   @@index([capability])
@@ -802,7 +812,32 @@ model AiSuggestion {
   createdAt        DateTime         @default(now())
   aiRun            AiRun            @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
   appliedByUser    User?            @relation("AiSuggestionAppliedBy", fields: [appliedByUserId], references: [id], onDelete: SetNull)
+  evaluations      AiEvaluation[]
 
   @@index([aiRunId])
+  @@index([targetEntityType, targetEntityId])
+}
+
+model AiEvaluation {
+  id               String              @id @default(uuid())
+  organizationId   String
+  aiRunId          String
+  aiSuggestionId   String?
+  targetEntityType String?
+  targetEntityId   String?
+  evaluatorUserId  String?
+  outcome          AiEvaluationOutcome
+  score            Float?
+  notes            String?
+  metadataJson     Json?
+  createdAt        DateTime            @default(now())
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  aiRun            AiRun               @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
+  aiSuggestion     AiSuggestion?       @relation(fields: [aiSuggestionId], references: [id], onDelete: SetNull)
+  evaluatorUser    User?               @relation("AiEvaluationEvaluator", fields: [evaluatorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([aiRunId])
+  @@index([aiSuggestionId])
   @@index([targetEntityType, targetEntityId])
 }
