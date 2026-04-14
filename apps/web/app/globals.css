@@ -2,6 +2,13 @@
   --bg: #f7f8fb;
   --text: #141823;
   --muted: #4f5a73;
+  --card: #ffffff;
+  --border: #d7dce6;
+  --shadow: 0 1px 2px rgba(20, 24, 35, 0.06);
+  --primary: #2a5bd7;
+  --danger: #b42318;
+  --ok: #067647;
+  --warn: #b54708;
 }
 
 * {
@@ -31,3 +38,265 @@ p {
   color: var(--muted);
 }
 
+a {
+  color: inherit;
+}
+
+.shell {
+  min-height: 100vh;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  z-index: 10;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 190px;
+}
+
+.brandLink {
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.brandSub {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.nav {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.navLink {
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+.navLinkActive {
+  background: rgba(42, 91, 215, 0.10);
+  color: var(--text);
+}
+
+.headerRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px 24px 60px;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 14px;
+}
+
+.callout {
+  border: 1px solid rgba(42, 91, 215, 0.22);
+  background: rgba(42, 91, 215, 0.05);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.cardTitle {
+  font-weight: 700;
+  margin: 0 0 8px 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.pill {
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: #fff;
+}
+
+.pillOk {
+  border-color: rgba(6, 118, 71, 0.35);
+  color: var(--ok);
+}
+
+.pillWarn {
+  border-color: rgba(181, 71, 8, 0.35);
+  color: var(--warn);
+}
+
+.pillDanger {
+  border-color: rgba(180, 35, 24, 0.35);
+  color: var(--danger);
+}
+
+.btn {
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.btnPrimary {
+  background: var(--primary);
+  border-color: rgba(42, 91, 215, 0.8);
+  color: #fff;
+}
+
+.btnDanger {
+  background: var(--danger);
+  border-color: rgba(180, 35, 24, 0.8);
+  color: #fff;
+}
+
+.btnGhost {
+  background: transparent;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  color: var(--text);
+}
+
+.textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.formGridSingle {
+  grid-template-columns: 1fr;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+th {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+pre {
+  margin: 0;
+  padding: 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  overflow: auto;
+  font-size: 12px;
+}
+
+.loginWrap {
+  min-height: calc(100vh - 80px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.loginInner {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.kvs {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 8px 12px;
+}
+
+.kvKey {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.kvVal {
+  font-size: 14px;
+}
+
+.suggestionHeader strong {
+  letter-spacing: 0.01em;
+}
+
+@media (max-width: 720px) {
+  .brand {
+    min-width: auto;
+  }
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+  .kvs {
+    grid-template-columns: 1fr;
+  }
+}
