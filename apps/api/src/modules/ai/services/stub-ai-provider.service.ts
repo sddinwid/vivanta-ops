@@ -102,6 +102,40 @@ export class StubAiProviderService implements AiProvider {
           confidence: hasMaintenance || hasBilling || hasUrgent ? 0.75 : 0.55
         };
       }
+    } else if (request.capability === AiCapability.APPROVAL_ASSIST) {
+      const invoiceNode =
+        input && typeof input === "object" && input["invoice"] && typeof input["invoice"] === "object"
+          ? (input["invoice"] as Record<string, unknown>)
+          : ({} as Record<string, unknown>);
+
+      const vendorNode =
+        input && typeof input === "object" && input["vendor"] && typeof input["vendor"] === "object"
+          ? (input["vendor"] as Record<string, unknown>)
+          : null;
+
+      const totalAmountRaw = invoiceNode["totalAmount"];
+      const totalAmount =
+        typeof totalAmountRaw === "number"
+          ? totalAmountRaw
+          : typeof totalAmountRaw === "string"
+            ? Number(totalAmountRaw)
+            : 0;
+
+      const vendorName = vendorNode && typeof vendorNode["name"] === "string" ? vendorNode["name"] : "";
+      const vendorLower = vendorName.toLowerCase();
+
+      const highValue = Number.isFinite(totalAmount) && totalAmount >= 5000;
+      const riskKeyword = /\bconstruction\b|\bemergency\b|\bafter hours\b/.test(vendorLower);
+
+      output = {
+        recommendedApproverRoles: highValue ? ["finance", "admin"] : ["finance"],
+        recommendedApproverUserIds: [],
+        recommendedFlowType: highValue || riskKeyword ? "multi_step" : "single_step",
+        reasoning: highValue
+          ? "Invoice total suggests higher-risk spend; recommending finance + admin."
+          : "Invoice total suggests standard spend; recommending finance.",
+        confidence: highValue || riskKeyword ? 0.78 : 0.62
+      };
     } else {
       output = {
         provider: request.providerName,
