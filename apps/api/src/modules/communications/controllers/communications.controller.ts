@@ -11,10 +11,12 @@ import {
   UseGuards
 } from "@nestjs/common";
 import { CurrentUser } from "../../../common/decorators/current-user.decorator";
+import { RequireAnyPermissions } from "../../../common/decorators/require-any-permissions.decorator";
 import { RequirePermissions } from "../../../common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "../../../common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "../../../common/guards/permissions.guard";
 import { RequestIdentity } from "../../../common/request-context/request-context.types";
+import { ApplyCommunicationAiSuggestionDto } from "../dto/apply-communication-ai-suggestion.dto";
 import { AssignThreadDto } from "../dto/assign-thread.dto";
 import { CommunicationFiltersDto } from "../dto/communication-filters.dto";
 import { CreateMessageDto } from "../dto/create-message.dto";
@@ -62,6 +64,54 @@ export class CommunicationsController {
       identity.organizationId,
       threadId
     );
+  }
+
+  @Get("threads/:threadId/ai-suggestions")
+  @RequireAnyPermissions("communication.read", "ai.read")
+  listAiSuggestions(
+    @CurrentUser() identity: RequestIdentity,
+    @Param("threadId", new ParseUUIDPipe()) threadId: string
+  ): Promise<unknown> {
+    return this.communicationsService.listAiSuggestionsScoped({
+      organizationId: identity.organizationId,
+      threadId
+    });
+  }
+
+  @Post("threads/:threadId/apply-triage")
+  @RequirePermissions("communication.write")
+  applyTriage(
+    @CurrentUser() identity: RequestIdentity,
+    @Req() req: { requestId?: string },
+    @Param("threadId", new ParseUUIDPipe()) threadId: string,
+    @Body() dto: ApplyCommunicationAiSuggestionDto
+  ): Promise<unknown> {
+    return this.communicationsService.applyTriageSuggestionScoped({
+      organizationId: identity.organizationId,
+      actorUserId: identity.userId,
+      threadId,
+      suggestionId: dto.suggestionId,
+      note: dto.note,
+      requestId: req.requestId
+    });
+  }
+
+  @Post("threads/:threadId/apply-summary")
+  @RequirePermissions("communication.write")
+  applySummary(
+    @CurrentUser() identity: RequestIdentity,
+    @Req() req: { requestId?: string },
+    @Param("threadId", new ParseUUIDPipe()) threadId: string,
+    @Body() dto: ApplyCommunicationAiSuggestionDto
+  ): Promise<unknown> {
+    return this.communicationsService.applySummarySuggestionScoped({
+      organizationId: identity.organizationId,
+      actorUserId: identity.userId,
+      threadId,
+      suggestionId: dto.suggestionId,
+      note: dto.note,
+      requestId: req.requestId
+    });
   }
 
   @Patch("threads/:threadId")
@@ -159,4 +209,3 @@ export class CommunicationsController {
     return this.communicationsService.queueUrgent(identity.organizationId);
   }
 }
-

@@ -39,4 +39,14 @@ export class AiPromptTemplatesRepository {
       orderBy: [{ version: "desc" }, { updatedAt: "desc" }]
     });
   }
+
+  findActiveByTemplateKey(templateKey: string): Promise<AiPromptTemplate | null> {
+    return this.prisma.aiPromptTemplate.findFirst({
+      where: {
+        templateKey,
+        isActive: true
+      },
+      orderBy: [{ version: "desc" }, { updatedAt: "desc" }]
+    });
+  }
 }

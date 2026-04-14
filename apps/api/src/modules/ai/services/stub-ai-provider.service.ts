@@ -41,6 +41,67 @@ export class StubAiProviderService implements AiProvider {
         ],
         confidence: 0.7
       };
+    } else if (request.capability === AiCapability.COMMUNICATION_ASSIST) {
+      const task = typeof input["task"] === "string" ? input["task"] : "triage";
+      const subject = typeof input["subject"] === "string" ? input["subject"] : "";
+      const lastMessages = Array.isArray(input["lastMessages"]) ? input["lastMessages"] : [];
+      const messageText = lastMessages
+        .map((m) => (m && typeof m === "object" ? (m as Record<string, unknown>)["bodyText"] : null))
+        .filter((t) => typeof t === "string")
+        .join("\n");
+
+      const combined = `${subject}\n${messageText}`.toLowerCase();
+      const hasUrgent = /\burgent\b|asap|immediately|right away/.test(combined);
+      const hasMaintenance = /\bleak\b|\bwater\b|\bbroken\b|\brepair\b|\bmold\b|\bheating\b|\bplumbing\b/.test(
+        combined
+      );
+      const hasBilling = /\binvoice\b|\bpayment\b|\bcharge\b|\bbill\b|\brefund\b/.test(combined);
+      const hasLease = /\blease\b|\brent\b|\bcontract\b/.test(combined);
+      const hasComplaint = /\bcomplaint\b|\bunhappy\b|\bterrible\b|\bnot acceptable\b/.test(combined);
+
+      if (task === "summary") {
+        const summarySubject = subject.trim().length > 0 ? subject.trim() : "No subject";
+        const firstSnippet =
+          messageText.trim().length > 0 ? messageText.trim().slice(0, 160) : "No message body";
+        const summary = `${summarySubject}. ${firstSnippet}`.trim();
+        const keyPoints = [
+          hasMaintenance ? "Issue relates to maintenance/repair" : null,
+          hasBilling ? "Conversation mentions billing/payment" : null,
+          hasUrgent ? "Sender indicates urgency" : null
+        ].filter((x): x is string => Boolean(x));
+
+        output = {
+          summary,
+          keyPoints,
+          confidence: 0.65
+        };
+      } else {
+        let topic: string = "other";
+        if (hasMaintenance) topic = "maintenance";
+        else if (hasBilling) topic = "billing";
+        else if (hasLease) topic = "lease";
+        else if (hasComplaint) topic = "complaint";
+        else topic = "general";
+
+        let urgency: string = "low";
+        if (hasUrgent) urgency = "urgent";
+        else if (hasMaintenance) urgency = "high";
+        else if (hasBilling) urgency = "medium";
+        else urgency = "low";
+
+        output = {
+          topic,
+          urgency,
+          recommendedCaseType: topic === "maintenance" ? "MAINTENANCE" : topic === "billing" ? "BILLING" : null,
+          recommendedPriority: urgency,
+          reasoning: hasMaintenance
+            ? "Detected maintenance-related keywords in subject/body."
+            : hasBilling
+              ? "Detected billing-related keywords in subject/body."
+              : "General communication; no strong signals in stub mode.",
+          confidence: hasMaintenance || hasBilling || hasUrgent ? 0.75 : 0.55
+        };
+      }
     } else {
       output = {
         provider: request.providerName,

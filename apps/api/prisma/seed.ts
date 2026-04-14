@@ -346,6 +346,62 @@ async function main(): Promise<void> {
       isActive: true
     }
   });
+
+  await prisma.aiPromptTemplate.upsert({
+    where: { templateKey_version: { templateKey: "communications.triage", version: 1 } },
+    update: {
+      isActive: true
+    },
+    create: {
+      templateKey: "communications.triage",
+      capability: AiCapability.COMMUNICATION_ASSIST,
+      version: 1,
+      systemPrompt: [
+        "You are an assistive communications triage tool.",
+        "Analyze the communication thread and produce a non-authoritative triage suggestion.",
+        "Return JSON only with keys: topic, urgency, recommendedCaseType, recommendedPriority, reasoning, confidence.",
+        "topic must be one of: maintenance, billing, general, complaint, lease, other.",
+        "urgency must be one of: low, medium, high, urgent.",
+        "recommendedCaseType and recommendedPriority may be null.",
+        "confidence must be a number 0.0 to 1.0.",
+        "Never claim certainty."
+      ].join("\n"),
+      userPromptTemplate: [
+        "Thread context (JSON):",
+        "{{inputJson}}",
+        "",
+        "Return JSON only."
+      ].join("\n"),
+      isActive: true
+    }
+  });
+
+  await prisma.aiPromptTemplate.upsert({
+    where: { templateKey_version: { templateKey: "communications.summary", version: 1 } },
+    update: {
+      isActive: true
+    },
+    create: {
+      templateKey: "communications.summary",
+      capability: AiCapability.COMMUNICATION_ASSIST,
+      version: 1,
+      systemPrompt: [
+        "You are an assistive communications summarization tool.",
+        "Write a short factual summary of the thread and list key points.",
+        "Return JSON only with keys: summary, keyPoints, confidence.",
+        "keyPoints must be an array of short strings.",
+        "confidence must be a number 0.0 to 1.0.",
+        "Never claim certainty. Do not invent facts."
+      ].join("\n"),
+      userPromptTemplate: [
+        "Thread context (JSON):",
+        "{{inputJson}}",
+        "",
+        "Return JSON only."
+      ].join("\n"),
+      isActive: true
+    }
+  });
 }
 
 void main()

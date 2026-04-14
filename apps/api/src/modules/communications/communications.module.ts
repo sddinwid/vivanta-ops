@@ -3,6 +3,7 @@ import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "../../common/guards/permissions.guard";
 import { PrismaModule } from "../../database/prisma/prisma.module";
 import { AuditModule } from "../audit/audit.module";
+import { AiModule } from "../ai/ai.module";
 import { WorkflowsModule } from "../workflows/workflows.module";
 import { CommunicationsController } from "./controllers/communications.controller";
 import { CommunicationMapper } from "./mappers/communication.mapper";
@@ -11,14 +12,16 @@ import { CommunicationsRepository } from "./repositories/communications.reposito
 import { MessageAttachmentsRepository } from "./repositories/message-attachments.repository";
 import { MessagesRepository } from "./repositories/messages.repository";
 import { CommunicationAssignmentService } from "./services/communication-assignment.service";
+import { CommunicationAiService } from "./services/communication-ai.service";
 import { CommunicationLinkingService } from "./services/communication-linking.service";
 import { CommunicationsService } from "./services/communications.service";
 
 @Module({
-  imports: [PrismaModule, AuditModule, WorkflowsModule],
+  imports: [PrismaModule, AuditModule, WorkflowsModule, AiModule],
   controllers: [CommunicationsController],
   providers: [
     CommunicationsService,
+    CommunicationAiService,
     CommunicationAssignmentService,
     CommunicationLinkingService,
     CommunicationsRepository,
