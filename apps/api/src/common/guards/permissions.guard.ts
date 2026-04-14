@@ -8,6 +8,7 @@ import { Reflector } from "@nestjs/core";
 import {
   REQUIRED_PERMISSIONS_KEY,
 } from "../decorators/require-permissions.decorator";
+import { REQUIRED_ANY_PERMISSIONS_KEY } from "../decorators/require-any-permissions.decorator";
 import { RequestWithContext } from "../request-context/request-context.types";
 import { PrismaService } from "../../database/prisma/prisma.service";
 
@@ -24,7 +25,17 @@ export class PermissionsGuard implements CanActivate {
       [context.getHandler(), context.getClass()]
     );
 
-    if (!requiredPermissions || requiredPermissions.length === 0) {
+    const requiredAnyPermissions = this.reflector.getAllAndOverride<string[]>(
+      REQUIRED_ANY_PERMISSIONS_KEY,
+      [context.getHandler(), context.getClass()]
+    );
+
+    const hasAllRequirement =
+      requiredPermissions && requiredPermissions.length > 0;
+    const hasAnyRequirement =
+      requiredAnyPermissions && requiredAnyPermissions.length > 0;
+
+    if (!hasAllRequirement && !hasAnyRequirement) {
       return true;
     }
 
@@ -63,11 +74,15 @@ export class PermissionsGuard implements CanActivate {
       });
     });
 
-    const hasAllPermissions = requiredPermissions.every((permission) =>
-      effectivePermissions.has(permission)
-    );
+    const hasAllPermissions = hasAllRequirement
+      ? requiredPermissions.every((permission) => effectivePermissions.has(permission))
+      : true;
 
-    if (!hasAllPermissions) {
+    const hasAnyPermissions = hasAnyRequirement
+      ? requiredAnyPermissions.some((permission) => effectivePermissions.has(permission))
+      : true;
+
+    if (!hasAllPermissions || !hasAnyPermissions) {
       throw new ForbiddenException("Insufficient permissions");
     }
 

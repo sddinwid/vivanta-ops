@@ -33,6 +33,12 @@ import { StubAiProviderService } from "./services/stub-ai-provider.service";
     AiSuggestionMapper,
     JwtAuthGuard,
     PermissionsGuard
+  ],
+  exports: [
+    AiProviderService,
+    AiPromptService,
+    AiRunsRepository,
+    AiSuggestionsRepository
   ]
 })
 export class AiModule {}

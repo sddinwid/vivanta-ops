@@ -17,10 +17,12 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Response } from "express";
 import { CurrentUser } from "../../../common/decorators/current-user.decorator";
+import { RequireAnyPermissions } from "../../../common/decorators/require-any-permissions.decorator";
 import { RequirePermissions } from "../../../common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "../../../common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "../../../common/guards/permissions.guard";
 import { RequestIdentity } from "../../../common/request-context/request-context.types";
+import { ApplyDocumentAiSuggestionDto } from "../dto/apply-document-ai-suggestion.dto";
 import { DocumentFiltersDto } from "../dto/document-filters.dto";
 import { LinkDocumentDto } from "../dto/link-document.dto";
 import { ReprocessDocumentDto } from "../dto/reprocess-document.dto";
@@ -73,6 +75,54 @@ export class DocumentsController {
     @Param("documentId", new ParseUUIDPipe()) documentId: string
   ): Promise<unknown> {
     return this.documentsService.getByIdScoped(identity.organizationId, documentId);
+  }
+
+  @Get(":documentId/ai-suggestions")
+  @RequireAnyPermissions("document.read", "ai.read")
+  listAiSuggestions(
+    @CurrentUser() identity: RequestIdentity,
+    @Param("documentId", new ParseUUIDPipe()) documentId: string
+  ): Promise<unknown> {
+    return this.documentsService.listAiSuggestionsScoped({
+      organizationId: identity.organizationId,
+      documentId
+    });
+  }
+
+  @Post(":documentId/apply-classification")
+  @RequirePermissions("document.write")
+  applyClassificationSuggestion(
+    @CurrentUser() identity: RequestIdentity,
+    @Req() req: { requestId?: string },
+    @Param("documentId", new ParseUUIDPipe()) documentId: string,
+    @Body() dto: ApplyDocumentAiSuggestionDto
+  ): Promise<unknown> {
+    return this.documentsService.applyClassificationSuggestionScoped({
+      organizationId: identity.organizationId,
+      documentId,
+      actorUserId: identity.userId,
+      suggestionId: dto.suggestionId,
+      note: dto.note,
+      requestId: req.requestId
+    });
+  }
+
+  @Post(":documentId/apply-extraction")
+  @RequirePermissions("document.write")
+  applyExtractionSuggestion(
+    @CurrentUser() identity: RequestIdentity,
+    @Req() req: { requestId?: string },
+    @Param("documentId", new ParseUUIDPipe()) documentId: string,
+    @Body() dto: ApplyDocumentAiSuggestionDto
+  ): Promise<unknown> {
+    return this.documentsService.applyExtractionSuggestionScoped({
+      organizationId: identity.organizationId,
+      documentId,
+      actorUserId: identity.userId,
+      suggestionId: dto.suggestionId,
+      note: dto.note,
+      requestId: req.requestId
+    });
   }
 
   @Patch(":documentId")
