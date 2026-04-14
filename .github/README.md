@@ -11,10 +11,11 @@ It is implemented as a NestJS modular monolith with PostgreSQL + Prisma and incl
 - communications threads/messages/queues
 - cases, tasks, and work orders
 - invoice + approval backbone
-- workflow visibility (`WorkflowRun`, `WorkflowEvent`) with orchestration facade
+- workflow visibility (WorkflowRun, WorkflowEvent) with orchestration facade
+- AI-assisted workflows with governed suggestion application
 - owner portal projection API (read-only, owner-scoped)
 
-It is designed as an internal operations system rather than a user-facing product, with APIs structured for future UI and automation layers.
+It also includes a minimal operator UI to demonstrate real system usage.
 
 ## Why This Project Exists
 
@@ -22,8 +23,8 @@ Property management operations are process-heavy and fragmented across tools.
 Teams typically manage documents, vendor work, communications, and approvals through manual handoffs and inconsistent workflows.
 
 This project is a practical foundation for:
-- a **system of record** for operational state
-- a **system of action** that can evolve into workflow-driven execution over time
+- a system of record for operational state
+- a system of action that can evolve into workflow-driven execution over time
 
 ## Design Principles
 
@@ -32,33 +33,47 @@ This project is a practical foundation for:
 - Modular monolith over premature microservices
 - Projection APIs instead of exposing internal models
 - Auditability by default
+- AI-assisted, not AI-controlled
 - Non-blocking orchestration (workflow hooks do not break domain logic)
 
 ## Architecture Overview
 
 ### Backend
 
-- NestJS modular monolith (`apps/api`)
+- NestJS modular monolith (apps/api)
 - Prisma + PostgreSQL persistence
 - JWT auth + RBAC permissions + organization scoping
-- consistent `/api/v1` routes, validation, and response envelope
+- consistent /api/v1 routes, validation, and response envelope
 
 ### Workflow Layer
 
-- `WorkflowRun` + `WorkflowEvent` tables for visibility
+- WorkflowRun + WorkflowEvent tables for visibility
 - workflow control endpoints (list/detail/events/retry/cancel)
-- Temporal facade service with stub-first execution mode, ready for extension
+- Temporal facade service with stub-first execution mode
+
+### AI Layer
+
+- provider-agnostic AI architecture with pluggable providers
+- AiRun + AiSuggestion persistence model
+- prompt templates and provider configs stored in database
+- capability-based execution (DOCUMENT_ANALYSIS, COMMUNICATION_ASSIST, etc.)
+- assistive suggestions with explicit operator application
+- evaluation and observability (AiEvaluation, scoring, feedback)
 
 ### Storage
 
-- local file storage adapter behind a storage abstraction
-- structured so an S3-style adapter can be added without rewriting document module logic
+- local file storage adapter behind abstraction
+- designed for future S3-compatible storage integration
 
 ### Frontend
 
-- Next.js app exists as an initial UI surface (`apps/web`)
-- current implementation is minimal and backend-first
-- full internal operations UI and portal experience are not yet implemented
+- Next.js operator UI (apps/web)
+- thin interface for interacting with:
+  - cases
+  - documents
+  - communications
+  - AI runs
+- intentionally minimal and backend-first
 
 ## Implemented Modules
 
@@ -71,99 +86,108 @@ This project is a practical foundation for:
 - Cases / Tasks / Work Orders
 - Invoices + Approval flows
 - Workflow visibility layer
+- AI foundation + assistive integrations
 - Owner portal read API
+
+## AI Capabilities
+
+AI is implemented as an assistive layer across multiple domains:
+
+- Document classification and extraction
+- Communication triage and summarization
+- Approval routing recommendations
+- Case categorization and workflow suggestions
+
+Key design characteristics:
+- no automatic mutation of core domain state
+- explicit apply endpoints for all AI suggestions
+- full auditability of runs, suggestions, and operator decisions
+- per-capability enable/disable controls
+- evaluation system for feedback and iteration
 
 ## Example Flow: Invoice Approval
 
 1. Invoice is created.
 2. Line items are added.
 3. Invoice is submitted for review.
-4. Invoice is submitted for approval.
-5. `ApprovalFlow` + `ApprovalStep` records are created.
-6. Approval decisions update invoice status.
-7. A `WorkflowRun` is created for visibility (`invoice_processing`).
+4. AI suggests approval routing.
+5. Operator reviews suggestion.
+6. Invoice is submitted for approval.
+7. ApprovalFlow + ApprovalStep records are created.
+8. WorkflowRun is recorded for visibility.
 
 ## Example End-to-End Flow
 
-1. A communication thread is created in the `communications` module.
-2. An operations user creates a case in the `cases` module for the same issue context.
-3. A work order is created from that case in the `work-orders` module.
-4. A vendor is assigned to the work order, with organization-level validation.
-5. Workflow visibility is recorded via `WorkflowRun` and `WorkflowEvent`, enabling traceability across modules without tightly coupling execution logic.
+1. A communication thread is created.
+2. AI generates triage and summary suggestions.
+3. An operator creates a case from the issue.
+4. AI suggests categorization and priority.
+5. A work order is created from the case.
+6. A vendor is assigned.
+7. WorkflowRun and WorkflowEvent track lifecycle.
 
 ## Workflow Architecture
 
-Workflows are currently a **visibility + orchestration layer**:
-- core domain transitions still execute in module services
+Workflows are currently a visibility + orchestration layer:
+- domain logic executes in module services
 - workflow records capture lifecycle visibility
-- Temporal integration is behind a facade boundary
-
-Not all business logic is in Temporal yet. The facade pattern is in place so selected flows can migrate incrementally later.
+- Temporal integration is abstracted behind a facade
 
 ## Repository Structure
 
-```text
-apps/api
-apps/web
-packages/*
-infra/docker
-docs/*
-```
+apps/api  
+apps/web  
+packages/*  
+infra/docker  
+docs/*  
 
 ## Local Setup
 
-```bash
-pnpm install
-docker compose -f infra/docker/docker-compose.yml up -d
-pnpm db:migrate
-pnpm db:seed
-pnpm dev
-```
+pnpm install  
+docker compose -f infra/docker/docker-compose.yml up -d  
+pnpm db:migrate  
+pnpm db:seed  
+pnpm dev  
 
-Optional first step:
+Optional:
 
-```bash
-cp .env.example .env
-```
-
-Local seeded admin credentials (dev only):
-- email: `admin@vivanta.local`
-- password: `ChangeMe123!`
+cp .env.example .env  
 
 ## Implemented vs Deferred
 
 ### Implemented
 
 - auth/access/audit foundation
-- operational domain modules (properties, owners, vendors, documents, communications, cases, tasks, work orders)
-- invoices + approvals backbone
-- workflow visibility + facade layer
-- owner portal read projections
+- operational domain modules
+- AI foundation and assistive integrations
+- workflow visibility and orchestration facade
+- minimal operator UI
 
 ### Deferred
 
-- AI classification/extraction
-- real Temporal workflows
+- production AI providers
+- real Temporal workflow execution
 - accounting integrations
 - notifications
-- tenant portal
+- tenant portal UI
 - production infrastructure
 
 ## Tradeoffs and Decisions
 
-- **Modular monolith vs microservices:** chosen to keep transaction boundaries simple and iteration speed high while domain boundaries stabilize.
-- **Workflow visibility before full orchestration:** `WorkflowRun`/`WorkflowEvent` provide operational traceability now without forcing premature workflow-engine coupling.
-- **Temporal behind a facade:** orchestration provider details are isolated so the system can migrate incrementally from stubbed behavior to real Temporal execution.
-- **Projection APIs for portal access:** owner-facing endpoints intentionally shape and scope data instead of exposing internal operational models directly.
-- **Audit-first design:** state-changing actions are recorded early so operational accountability and debugging remain reliable as complexity grows.
+- Modular monolith for speed and simplicity
+- Workflow visibility before full orchestration
+- AI as assistive layer, not autonomous system
+- Provider abstraction to avoid vendor lock-in
+- Projection APIs for safe external exposure
 
 ## Future Direction
 
-- expand workflow orchestration from facade-first visibility to selected real Temporal executions
-- layer in AI where it improves operator workflows
-- add external integration adapters (accounting, delivery, notifications)
-- build full portal and internal product UI surfaces on top of current APIs
+- expand AI capabilities with real providers
+- move selected workflows into Temporal execution
+- integrate external systems (accounting, payments)
+- build full operator and owner-facing UI
+- introduce predictive and optimization workflows
 
 ---
 
-This repository represents a backend foundation that can evolve into a full workflow-driven operations platform without requiring a rewrite of core domain logic.
+This repository represents a backend foundation for a workflow-driven, AI-assisted operations platform.
