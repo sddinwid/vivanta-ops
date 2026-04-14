@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { AppShell } from "../components/layout/AppShell";
 
 export const metadata: Metadata = {
   title: "Vivanta Operations OS",
@@ -14,9 +15,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <main>{children}</main>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
 }
-
