@@ -40,6 +40,27 @@ export class AiSuggestionsRepository {
     });
   }
 
+  listByTargetEntityScoped(params: {
+    organizationId: string;
+    targetEntityType: string;
+    targetEntityId: string;
+    suggestionTypes?: Prisma.AiSuggestionWhereInput["suggestionType"];
+    limit?: number;
+  }): Promise<AiSuggestion[]> {
+    return this.prisma.aiSuggestion.findMany({
+      where: {
+        targetEntityType: params.targetEntityType,
+        targetEntityId: params.targetEntityId,
+        suggestionType: params.suggestionTypes,
+        aiRun: {
+          organizationId: params.organizationId
+        }
+      },
+      orderBy: { createdAt: "desc" },
+      take: params.limit ?? 100
+    });
+  }
+
   update(suggestionId: string, data: Prisma.AiSuggestionUpdateInput): Promise<AiSuggestion> {
     return this.prisma.aiSuggestion.update({
       where: { id: suggestionId },

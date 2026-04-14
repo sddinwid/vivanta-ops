@@ -17,7 +17,9 @@ import { UploadDocumentDto } from "../dto/upload-document.dto";
 import { DocumentMapper } from "../mappers/document.mapper";
 import { AttachmentsRepository } from "../repositories/attachments.repository";
 import { DocumentsRepository } from "../repositories/documents.repository";
+import { AiSuggestionMapper } from "../../ai/mappers/ai-suggestion.mapper";
 import { DocumentLinkingService } from "./document-linking.service";
+import { DocumentAiService } from "./document-ai.service";
 import { DocumentStorageService } from "./document-storage.service";
 import { WorkflowFacadeService } from "../../workflows/services/workflow-facade.service";
 
@@ -30,6 +32,7 @@ export class DocumentsService {
     private readonly attachmentsRepository: AttachmentsRepository,
     private readonly documentStorageService: DocumentStorageService,
     private readonly documentLinkingService: DocumentLinkingService,
+    private readonly documentAiService: DocumentAiService,
     private readonly auditService: AuditService,
     private readonly workflowFacadeService: WorkflowFacadeService
   ) {}
@@ -154,6 +157,22 @@ export class DocumentsService {
       );
     }
 
+    // Assistive-only: classification/extraction runs create auditable suggestions but never mutate the document.
+    // We keep this non-blocking for the upload happy-path.
+    try {
+      await this.documentAiService.runAssistiveClassificationAndMaybeExtraction({
+        organizationId,
+        actorUserId,
+        documentId: document.id,
+        trigger: "upload",
+        requestId
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Document AI assist failed for documentId=${document.id}: ${error instanceof Error ? error.message : "unknown error"}`
+      );
+    }
+
     return DocumentMapper.toResponse(withLinks);
   }
 
@@ -269,7 +288,72 @@ export class DocumentsService {
       newValues: DocumentMapper.toResponse(updated),
       metadata: { requestId, note: dto.note }
     });
+
+    // Treat reprocess as a manual trigger: we can re-run assistive AI and (when relevant) invoice extraction.
+    try {
+      await this.documentAiService.runAssistiveClassificationAndMaybeExtraction({
+        organizationId,
+        actorUserId,
+        documentId,
+        trigger: "reprocess",
+        requestId
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Document AI assist failed during reprocess for documentId=${documentId}: ${error instanceof Error ? error.message : "unknown error"}`
+      );
+    }
     return DocumentMapper.toResponse(updated);
+  }
+
+  async listAiSuggestionsScoped(params: {
+    organizationId: string;
+    documentId: string;
+    limit?: number;
+  }) {
+    const suggestions = await this.documentAiService.listDocumentSuggestions(params);
+    const classification = suggestions.classification.map(AiSuggestionMapper.toResponse);
+    const extraction = suggestions.extraction.map(AiSuggestionMapper.toResponse);
+    return {
+      data: {
+        classification,
+        extraction
+      },
+      meta: {
+        total: classification.length + extraction.length
+      }
+    };
+  }
+
+  async applyClassificationSuggestionScoped(params: {
+    organizationId: string;
+    documentId: string;
+    actorUserId: string;
+    suggestionId: string;
+    requestId?: string;
+    note?: string;
+  }) {
+    const result = await this.documentAiService.applyClassificationSuggestion(params);
+    return {
+      data: {
+        document: DocumentMapper.toResponse(result.document),
+        suggestionId: result.suggestionId
+      }
+    };
+  }
+
+  async applyExtractionSuggestionScoped(params: {
+    organizationId: string;
+    documentId: string;
+    actorUserId: string;
+    suggestionId: string;
+    requestId?: string;
+    note?: string;
+  }) {
+    const result = await this.documentAiService.applyExtractionSuggestion(params);
+    return {
+      data: result
+    };
   }
 
   private async requireScopedDocument(documentId: string, organizationId: string) {

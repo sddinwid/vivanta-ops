@@ -4,21 +4,24 @@ import { PermissionsGuard } from "../../common/guards/permissions.guard";
 import { PrismaModule } from "../../database/prisma/prisma.module";
 import { StorageModule } from "../../infrastructure/storage/storage.module";
 import { AuditModule } from "../audit/audit.module";
+import { AiModule } from "../ai/ai.module";
 import { WorkflowsModule } from "../workflows/workflows.module";
 import { DocumentsController } from "./controllers/documents.controller";
 import { DocumentMapper } from "./mappers/document.mapper";
 import { AttachmentsRepository } from "./repositories/attachments.repository";
 import { DocumentLinksRepository } from "./repositories/document-links.repository";
 import { DocumentsRepository } from "./repositories/documents.repository";
+import { DocumentAiService } from "./services/document-ai.service";
 import { DocumentLinkingService } from "./services/document-linking.service";
 import { DocumentsService } from "./services/documents.service";
 import { DocumentStorageService } from "./services/document-storage.service";
 
 @Module({
-  imports: [PrismaModule, StorageModule, AuditModule, WorkflowsModule],
+  imports: [PrismaModule, StorageModule, AuditModule, WorkflowsModule, AiModule],
   controllers: [DocumentsController],
   providers: [
     DocumentsService,
+    DocumentAiService,
     DocumentLinkingService,
     DocumentStorageService,
     DocumentsRepository,

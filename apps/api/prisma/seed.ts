@@ -1,5 +1,6 @@
 import * as bcrypt from "bcryptjs";
 import {
+  AiCapability,
   OrganizationStatus,
   PrismaClient,
   UserStatus,
@@ -286,6 +287,63 @@ async function main(): Promise<void> {
     create: {
       userId: adminUser.id,
       roleId: adminRole.id
+    }
+  });
+
+  // Seed minimal, auditable prompt templates for document AI (assistive-only).
+  // These can be edited via the AI admin API later; we just want a safe baseline.
+  await prisma.aiPromptTemplate.upsert({
+    where: { templateKey_version: { templateKey: "documents.classification", version: 1 } },
+    update: {
+      isActive: true
+    },
+    create: {
+      templateKey: "documents.classification",
+      capability: AiCapability.DOCUMENT_ANALYSIS,
+      version: 1,
+      systemPrompt: [
+        "You are an assistive document classifier.",
+        "Classify the uploaded document into one of: invoice, lease, contract, unknown.",
+        "Return JSON only with keys: documentType, confidence, reasoning.",
+        "confidence must be a number 0.0 to 1.0.",
+        "reasoning should be short and optional.",
+        "Never claim certainty. This output is non-authoritative."
+      ].join("\n"),
+      userPromptTemplate: [
+        "Document metadata (JSON):",
+        "{{inputJson}}",
+        "",
+        "Return JSON only."
+      ].join("\n"),
+      isActive: true
+    }
+  });
+
+  await prisma.aiPromptTemplate.upsert({
+    where: { templateKey_version: { templateKey: "documents.invoice_extraction", version: 1 } },
+    update: {
+      isActive: true
+    },
+    create: {
+      templateKey: "documents.invoice_extraction",
+      capability: AiCapability.INVOICE_ANALYSIS,
+      version: 1,
+      systemPrompt: [
+        "You are an assistive invoice field extraction tool.",
+        "Extract invoice-like fields and return JSON only with keys:",
+        "invoiceNumber, invoiceDate, dueDate, vendorName, totalAmount, currency, lineItems, confidence.",
+        "lineItems must be an array of { description, quantity, unitPrice, lineTotal }.",
+        "Dates must be ISO format (YYYY-MM-DD) when present.",
+        "confidence must be a number 0.0 to 1.0.",
+        "Never claim certainty. This output is non-authoritative."
+      ].join("\n"),
+      userPromptTemplate: [
+        "Document metadata (JSON):",
+        "{{inputJson}}",
+        "",
+        "Return JSON only."
+      ].join("\n"),
+      isActive: true
     }
   });
 }
